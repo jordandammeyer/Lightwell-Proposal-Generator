@@ -89,8 +89,22 @@ table.g input{border:none;background:transparent;padding:6px 7px;width:100%;min-
 table.g input:focus{background:#fffbea;outline:none;box-shadow:inset 0 0 0 1px var(--yellow)}
 table.g input:disabled{color:#98a2b3;font-style:italic}
 table.g td.ctl,table.g th.ctl{width:1%;white-space:nowrap;padding:0 4px;background:#fafbfc}
+table.g.selt tr>td.ctl:first-child,table.g.selt tr>th.ctl:first-child{width:150px;min-width:150px;max-width:150px}
+table.g.selt td.ctl:first-child select{width:112px}
 table.g select{border:none;background:transparent;font-size:11px;color:#475467;padding:4px 2px}
 table.g tr.s-sub td:nth-child(2) input{padding-left:22px}
+table.g tr.ptot td{background:var(--cream);border-top:2px solid #d0c38a}
+table.g tr.ptot input:disabled{color:var(--navy);font-weight:700;font-style:normal}
+table.g tr.picked td{background:#fff1f0}
+table.g td.ctl:first-child,table.g th.ctl:first-child{min-width:142px;width:142px}
+table.g td.ctl:first-child select{width:104px}
+table.g input.rsel,table.g input.rselAll{width:auto;min-width:0;margin:0 4px 0 6px;vertical-align:middle}
+.selbar{display:none;align-items:center;gap:8px;flex-wrap:wrap;background:#fff1f0;border:1px solid #fecdca;border-radius:6px;padding:6px 10px;margin-top:6px}
+.selbar.on{display:flex}
+.selbar b{font-size:12px;color:#912018}
+table.g tr.wrow th{background:#f8f9fb;font-weight:400}
+table.g tr.wrow input{font-size:11px;color:#475467;padding:3px 7px;min-width:0}
+.wl{font-size:10px;color:#667085;padding:0 4px}
 table.g tr.s-hl td{background:#fff8dc}
 table.g tr.s-grp td input,table.g tr.s-bold td input{font-weight:700}
 .thc{display:flex;align-items:center}
@@ -146,7 +160,7 @@ table.g tr.s-grp td input,table.g tr.s-bold td input{font-weight:700}
 .sec:first-child{margin-top:0}
 .bar{background:var(--navy);color:#fff;font-weight:700;font-size:10.5pt;letter-spacing:1.6pt;text-transform:uppercase;padding:4.5pt .55in 4.5pt .55in;break-after:avoid;page-break-after:avoid}
 .in{padding:0 .55in}
-.carrier{font-style:italic;font-size:10.5pt;margin:12pt 0 0}
+.doc .carrier{font-style:italic;font-size:10.5pt;margin:14pt 0 0}
 .blk{margin-top:11pt;break-inside:auto}
 .bh{color:var(--navy);font-weight:700;font-size:10.5pt;margin:0 0 6pt;break-after:avoid;page-break-after:avoid}
 .doc p{margin:0 0 6pt}
@@ -163,6 +177,10 @@ table.t th{background:var(--cream);color:var(--navy);font-weight:700;text-align:
 table.t td{border:.75pt solid #a3a3a3;padding:2.2pt 4pt;vertical-align:top}
 table.t tr{break-inside:avoid;page-break-inside:avoid}
 table.t thead{display:table-header-group}
+table.t.dense{font-size:8pt}
+table.t.dense th{font-size:8pt;padding:3pt 3pt}
+table.t.dense td{padding:2pt 3pt}
+table.t td,table.t th{overflow-wrap:break-word}
 table.t .c{text-align:center}
 table.t .r{text-align:right}
 table.t tr.s-sub td:first-child{padding-left:16pt}
@@ -292,6 +310,14 @@ function calcCell(col, cells){
   return "";
 }
 
+function rowVals(cols,cells){ const v=cells.slice(); cols.forEach((c,i)=>{ if(c.calc) v[i]=calcCell(c,v); }); return v; }
+function totalCells(t){
+  const cols=t.cols;
+  const sums=cols.map((c,i)=>{ if(!c.m||c.calc) return ""; const vals=t.rows.map(r=>num(r.c[i])); return vals.every(isNaN)?"":money(vals.reduce((a,b)=>a+(isNaN(b)?0:b),0)); });
+  const cells=rowVals(cols,sums);
+  const firstText=cols.findIndex(c=>!c.m&&!c.calc); if(firstText>=0&&!cells[firstText]) cells[firstText]="Total";
+  return cells;
+}
 /* ---------- building blocks ---------- */
 const C=(l,o={})=>({l, a:o.a||"l", w:o.w||null, m:!!o.m, calc:o.calc||null});
 const R=(c,s="")=>({c, s});
@@ -306,18 +332,18 @@ function sec(preset,title,carrier,blocks,newPage=true){ return {id:uid(), kind:"
 /* ---------- presets (mirror the Word templates) ---------- */
 const PRESETS = [
  {id:"locations", g:"Locations", name:"Schedule of locations (blanket)", make:()=>sec("locations","Schedule of Locations",false,[
-   T("",[C("Loc #",{a:"c",w:6}),C("Bldg #",{a:"c",w:6}),C("Building Name",{w:24}),C("Street Address",{w:22}),C("City",{w:13}),C("State",{a:"c",w:7}),C("Zip Code",{a:"c",w:10}),C("Blkt #",{a:"c",w:6})],
+   T("",[C("Loc #",{a:"c",w:5}),C("Bldg #",{a:"c",w:5}),C("Building Name",{w:25}),C("Street Address",{w:28}),C("City",{w:16}),C("State",{a:"c",w:6}),C("Zip Code",{a:"c",w:9}),C("Blkt #",{a:"c",w:6})],
      [R(["","","Mailing Address","","","","",""],"hl"),...blank(3,8)])])},
  {id:"locations_values", g:"Locations", name:"Schedule of locations (scheduled values)", make:()=>sec("locations_values","Schedule of Locations",false,[
-   T("",[C("Loc #",{a:"c",w:5}),C("Bldg #",{a:"c",w:5}),C("Building Name",{w:13}),C("Street Address",{w:14}),C("Expiring Bldgs",{a:"r",m:true}),C("Expiring BPP",{a:"r",m:true}),C("Expiring Total",{a:"r",m:true,calc:{op:"sum",of:[4,5]}}),C("Renewal Bldgs",{a:"r",m:true}),C("Renewal BPP",{a:"r",m:true}),C("Renewal Total",{a:"r",m:true,calc:{op:"sum",of:[7,8]}}),C("YOY Change",{a:"r",calc:{op:"yoy",of:[6,9]}})],
-     [R(["-","","Mailing Address","[Mailing Address]","","","","","","",""],"hl"),...blank(3,11)],{total:true})])},
+   T("",[C("Loc #",{a:"c",w:5}),C("Bldg #",{a:"c",w:5}),C("Building Name",{w:22}),C("Street Address",{w:32}),C("Building",{a:"r",m:true,w:12}),C("BPP",{a:"r",m:true,w:12}),C("Total",{a:"r",m:true,w:12,calc:{op:"sum",of:[4,5]}})],
+     [R(["-","","Mailing Address","[Mailing Address]","","",""],"hl"),...blank(3,7)],{total:true})])},
  {id:"property_blanket", g:"Property", name:"Property (blanket)", make:()=>sec("property_blanket","Property",true,[
    T("",[C("Blanket #",{a:"c",w:9}),C("Blanket Type",{a:"c",w:27}),C("Limit",{a:"c",w:14}),C("Valuation",{a:"c",w:19}),C("Co-Insurance",{a:"c",w:15}),C("Perils",{a:"c",w:11})],
      [["1","[Blanket Description]","[Limit]","Replacement Cost*","Waived","Special"],["2","[Blanket Description]","[Limit]","Replacement Cost*","Waived","Special"]]),
-   B("Notes Related to Property Coverage:",["**Year-over-year change in insured values is a [%] increase.**","Some buildings are not included in a blanket due to location or building type (see below)."]),
-   T("Scheduled Buildings:",[C("Loc #",{a:"c",w:6}),C("Bldg #",{a:"c",w:6}),C("Description",{w:44}),C("Expiring Value",{a:"r",m:true,w:16}),C("Renewal Value",{a:"r",m:true,w:16}),C("YOY Change",{a:"r",w:12,calc:{op:"yoy",of:[3,4]}})],blank(3,6))])},
+   B("Notes Related to Property Coverage:",["**Total insured value (TIV) is [$], a [%] increase over expiring.**","Some buildings are not included in a blanket due to location or building type (see below)."]),
+   T("Scheduled Buildings:",[C("Loc #",{a:"c",w:6}),C("Bldg #",{a:"c",w:6}),C("Description",{w:64}),C("Limit",{a:"r",m:true,w:24})],blank(3,4))])},
  {id:"property_scheduled", g:"Property", name:"Property (scheduled values)", make:()=>sec("property_scheduled","Property",true,[
-   B("Notes Related to Property Coverage:",["**Year-over-year change in insured values is a [%] increase.**"])])},
+   B("Notes Related to Property Coverage:",["**Total insured value (TIV) is [$], a [%] increase over expiring.**"])])},
  {id:"property_ext", g:"Property", name:"Property – coverage extensions & deductibles", make:()=>sec("property_ext","Property – Additional Coverages, Extensions, and Deductibles",false,[
    T("",[C("Coverage Extension",{w:52}),C("Limit",{w:48})],[["Earnings & Donations & Extra Expense","[Limit]"],["Earthquake","[Limit]"],["Water Damage (Flood, Backup, and Subsurface)","[Limit]"],["Sewer & Drain Backup","Included – Blanket Limit"],["Interior Building Damage, Gutter Damage","Included – Blanket Limit"],["Systems & Equipment Breakdown","Included – Blanket Limit"],["Terrorism","Included – Blanket Limit"]]),
    T("",[C("Cause of Loss",{w:52}),C("Deductible",{w:48})],[["Earthquake","[Deductible]"],["Flood, Backup, and Subsurface Water","[Deductible]"],["Windstorm or Hail","[Deductible]"],["Business Income","None"],["Any Other Covered Loss","[Deductible]"]]),
@@ -462,21 +488,16 @@ function renderCover(){
 }
 
 function renderTable(t){
-  const cols=t.cols; const widths=cols.some(c=>c.w);
-  const cg=widths?`<colgroup>${cols.map(c=>`<col${c.w?` style="width:${c.w}%"`:""}>`).join("")}</colgroup>`:"";
+  const cols=t.cols; const ws=cols.map(c=>+c.w>0?+c.w:0); const widths=ws.some(Boolean); const allSet=ws.every(Boolean);
+  const sumW=ws.reduce((x,y)=>x+y,0)||1;
+  const cg=widths?`<colgroup>${cols.map((c,i)=>`<col${ws[i]?` style="width:${allSet?(ws[i]/sumW*100).toFixed(2):ws[i]}%"`:""}>`).join("")}</colgroup>`:"";
   const al=c=>c.a==="c"?' class="c"':c.a==="r"?' class="r"':"";
   const head=`<thead><tr>${cols.map(c=>`<th${al(c)}>${esc(c.l)}</th>`).join("")}</tr></thead>`;
-  const body=t.rows.map(r=>`<tr class="s-${r.s||"n"}">${cols.map((c,i)=>{const v=c.calc?calcCell(c,r.c):r.c[i]; return `<td${al(c)}>${rich(v)}</td>`;}).join("")}</tr>`).join("");
+  const fm=(c,v)=>c.m&&!isNaN(num(v))?money(num(v)):v;
+  const body=t.rows.map(r=>{ const v=rowVals(cols,r.c); return `<tr class="s-${r.s||"n"}">${cols.map((c,i)=>`<td${al(c)}>${rich(fm(c,v[i]))}</td>`).join("")}</tr>`; }).join("");
   let tot="";
-  if(t.total){
-    const sums=cols.map((c,i)=>{ if(!c.m||c.calc) return ""; const vals=t.rows.map(r=>num(r.c[i])); return vals.every(isNaN)?"":money(vals.reduce((a,b)=>a+(isNaN(b)?0:b),0)); });
-    const cells=cols.map((c,i)=>i===0&&!c.m?"Total":c.calc?calcCell(c,sums):sums[i]);
-    if(cols[0].m) cells[0]=sums[0];
-    const firstText=cols.findIndex(c=>!c.m&&!c.calc);
-    if(firstText>=0) cells[firstText]= cells[firstText]||"Total";
-    tot=`<tr class="s-total">${cols.map((c,i)=>`<td${al(c)}>${esc(cells[i])}</td>`).join("")}</tr>`;
-  }
-  return `<table class="t">${cg}${head}<tbody>${body}${tot}</tbody></table>`;
+  if(t.total){ const cells=totalCells(t); tot=`<tr class="s-total">${cols.map((c,i)=>`<td${al(c)}>${esc(cells[i])}</td>`).join("")}</tr>`; }
+  return `<table class="t${cols.length>=9?" dense":""}"${allSet?' style="table-layout:fixed"':""}>${cg}${head}<tbody>${body}${tot}</tbody></table>`;
 }
 function renderList(items, ordered){
   const tag=ordered?"ol":"ul"; let html=`<${tag}>`; let open=false;
@@ -487,12 +508,13 @@ function renderList(items, ordered){
   if(open) html+=`</${tag}></li>`;
   return html+`</${tag}>`;
 }
-function renderBlock(b){
+const isAudit=(s,it)=>s&&s.preset==="wc"&&/audit/i.test(it.k||"");
+function renderBlock(b,s){
   const h=b.heading?`<div class="bh">${rich(b.heading)}</div>`:"";
   if(b.type==="table") return `<div class="blk">${h}${renderTable(b)}</div>`;
   if(b.type==="bullets"||b.type==="numbered") return b.items.length?`<div class="blk">${h}${renderList(b.items,b.type==="numbered")}</div>`:(h?`<div class="blk">${h}</div>`:"");
   if(b.type==="text") return `<div class="blk">${h}${String(b.text||"").split(/\n\s*\n/).filter(x=>x.trim()).map(p=>`<p>${rich(p).replace(/\n/g,"<br>")}</p>`).join("")}</div>`;
-  if(b.type==="kv") return `<div class="blk kv">${h}${b.items.filter(i=>i.k||i.v).map(i=>`<p>${rich(i.k)}${i.k&&i.v?": ":""}${rich(i.v)}</p>`).join("")}</div>`;
+  if(b.type==="kv") return `<div class="blk kv">${h}${b.items.filter(i=>i.k||i.v).map(i=>{ const v=isAudit(s,i)?"Annual":i.v; return `<p>${rich(i.k)}${i.k&&v?": ":""}${rich(v)}</p>`; }).join("")}</div>`;
   return "";
 }
 function premiumTotals(s){
@@ -500,19 +522,23 @@ function premiumTotals(s){
   const sum=a=>a.reduce((x,y)=>x+(isNaN(y)?0:y),0);
   const pending=s.rows.some(r=>String(r.propP).trim()&&isNaN(num(r.propP)));
   const eT=E.every(isNaN)?NaN:sum(E), pT=Pp.every(isNaN)?NaN:sum(Pp);
-  return {eT,pT,pending};
+  const both=s.rows.map((r,i)=>!isNaN(E[i])&&!isNaN(Pp[i]));
+  const eL=sum(E.filter((v,i)=>both[i])), pL=sum(Pp.filter((v,i)=>both[i]));
+  const yoy=both.some(Boolean)?pct(eL,pL):"";
+  return {eT,pT,pending,yoy};
 }
 function fmtPrem(v){ const n=num(v); return isNaN(n)?v:money(n); }
 function renderPremium(s){
-  const ex=s.showExpiring; const {eT,pT,pending}=premiumTotals(s);
+  const ex=s.showExpiring; const {eT,pT,pending,yoy}=premiumTotals(s);
+  const star=/^\s*\*(?!\*)/.test(s.foot||"")?"*":"";
   const pendCls=v=>String(v).trim()&&isNaN(num(v))?' style="color:#c00000"':"";
-  const head=ex?`<tr><th style="width:24%">Coverage Type</th><th class="r" style="width:14%">Expiring Premium</th><th style="width:17%">Expiring Carrier</th><th class="r" style="width:14%">Proposed Premium</th><th style="width:17%">Proposed Carrier</th><th class="r" style="width:14%">YoY Change</th></tr>`
-              :`<tr><th style="width:44%">Coverage Type</th><th class="r" style="width:22%">Proposed Premium</th><th style="width:34%">Proposed Carrier</th></tr>`;
+  const head=ex?`<tr><th style="width:24%">Coverage Type</th><th class="r" style="width:14%">Expiring Premium</th><th style="width:17%">Expiring Carrier</th><th class="r" style="width:14%">Proposed Premium${star}</th><th style="width:17%">Proposed Carrier</th><th class="r" style="width:14%">YoY Change</th></tr>`
+              :`<tr><th style="width:44%">Coverage Type</th><th class="r" style="width:22%">Proposed Premium${star}</th><th style="width:34%">Proposed Carrier</th></tr>`;
   const rows=s.rows.filter(r=>String(r.propP).trim()||String(r.expP).trim()).map(r=>ex
     ?`<tr><td>${rich(r.cov)}</td><td class="r">${esc(fmtPrem(r.expP))}</td><td>${esc(r.expC)}</td><td class="r"${pendCls(r.propP)}>${esc(fmtPrem(r.propP))}</td><td>${esc(r.propC)}</td><td class="r">${esc(pct(num(r.expP),num(r.propP)))}</td></tr>`
     :`<tr><td>${rich(r.cov)}</td><td class="r"${pendCls(r.propP)}>${esc(fmtPrem(r.propP))}</td><td>${esc(r.propC)}</td></tr>`).join("");
   const plus=pending?"+":"";
-  const tot=ex?`<tr class="s-total"><td>Total</td><td class="r">${esc(money(eT))}</td><td></td><td class="r">${esc(money(pT))}${plus}</td><td></td><td class="r">${esc(pct(eT,pT))}${pct(eT,pT)?plus:""}</td></tr>`
+  const tot=ex?`<tr class="s-total"><td>Total</td><td class="r">${esc(money(eT))}</td><td></td><td class="r">${esc(money(pT))}${plus}</td><td></td><td class="r">${esc(yoy)}</td></tr>`
              :`<tr class="s-total"><td>Total</td><td class="r">${esc(money(pT))}${plus}</td><td></td></tr>`;
   return `<div class="blk"><table class="t"><thead>${head}</thead><tbody>${rows}${tot}</tbody></table>${s.foot?`<div class="foot">${rich(s.foot)}</div>`:""}</div>`;
 }
@@ -552,7 +578,7 @@ function renderConsent(s){
 }
 function renderSection(s){
   let inner="";
-  if(s.kind==="std"){ inner=(s.showCarrier?`<p class="carrier">Proposed Carrier: ${esc(s.carrier||"[Proposed Carrier]")}</p>`:"")+s.blocks.map(renderBlock).join(""); }
+  if(s.kind==="std"){ inner=(s.showCarrier?`<p class="carrier">Proposed Carrier: ${esc(s.carrier||"[Proposed Carrier]")}</p>`:"")+s.blocks.map(b=>renderBlock(b,s)).join("")+(s.preset==="wc"&&!s.blocks.some(b=>b.type==="kv"&&b.items.some(i=>isAudit(s,i)))?`<div class="blk kv"><p>Audit Requirement: Annual</p></div>`:""); }
   else if(s.kind==="premium") inner=renderPremium(s);
   else if(s.kind==="acceptance") inner=renderAcceptance(s);
   else if(s.kind==="consent") return `<div class="sec${s.newPage?" np":""}" id="pv-${s.id}"><div class="in">${renderConsent(s)}</div></div>`;
@@ -565,6 +591,8 @@ function renderDoc(){
 /* ===================================================================
    EDITOR RENDERING
    =================================================================== */
+const SELR={}; const SELLAST={}; // transient row selections, keyed by table id (never saved)
+const selOf=id=>(SELR[id]=SELR[id]||new Set());
 const STY=[["","Normal"],["sub","Indented"],["grp","Group heading"],["bold","Bold"],["hl","Highlight"]];
 function inp(path,val,ph="",extra=""){ return `<input class="inp" data-p="${path}" value="${esc(val)}" placeholder="${esc(ph)}" ${extra}>`; }
 function fld(label,path,val,ph=""){ return `<div class="f"><label>${label}</label>${inp(path,val,ph)}</div>`; }
@@ -593,17 +621,24 @@ function editorCover(){
 }
 function editorTable(b,bp){
   const cols=b.cols;
-  const head=`<tr><th class="ctl"></th>${cols.map((c,i)=>`<th style="min-width:${Math.max(95,Math.round((c.w||15)*5.2))}px"><div class="thc"><input data-p="${bp}.cols.${i}.l" value="${esc(c.l)}" aria-label="Column name">${c.calc?'<span class="hint" style="margin:0 4px">auto</span>':""}<button class="ibtn x" title="Remove column" data-act="delCol" data-p="${bp}" data-i="${i}">✕</button></div></th>`).join("")}<th class="ctl"></th></tr>`;
-  const rows=b.rows.map((r,ri)=>`<tr class="s-${r.s||"n"}"><td class="ctl"><select data-p="${bp}.rows.${ri}.s" aria-label="Row style">${STY.map(([v,l])=>`<option value="${v}"${(r.s||"")===v?" selected":""}>${l}</option>`).join("")}</select></td>${cols.map((c,ci)=>c.calc?`<td><input disabled value="${esc(calcCell(c,r.c))}"></td>`:`<td><input data-p="${bp}.rows.${ri}.c.${ci}" value="${esc(r.c[ci])}"></td>`).join("")}<td class="ctl">${mv(`${bp}.rows.${ri}`)}</td></tr>`).join("");
-  return `<div class="gwrap"><table class="g"><thead>${head}</thead><tbody>${rows}</tbody></table></div>
-   <div class="addbar"><button class="btn sm" data-act="addRow" data-p="${bp}">+ Row</button><button class="btn sm" data-act="addCol" data-p="${bp}">+ Column</button>${chk("Total row",`${bp}.total`,b.total)}</div>`;
+  const ss=selOf(b.id); [...ss].forEach(i=>{ if(i>=b.rows.length) ss.delete(i); });
+  const nsub=b.rows.filter(r=>r.s==="sub").length;
+  const head=`<tr><th class="ctl"><input type="checkbox" class="rselAll" data-t="${b.id}" ${b.rows.length&&ss.size===b.rows.length?"checked":""} title="Select all rows" aria-label="Select all rows"></th>${cols.map((c,i)=>`<th style="min-width:${Math.max(95,Math.round((c.w||15)*5.2))}px"><div class="thc"><input data-p="${bp}.cols.${i}.l" value="${esc(c.l)}" aria-label="Column name">${c.calc?'<span class="hint" style="margin:0 4px">auto</span>':""}<button class="ibtn x" title="Remove column" data-act="delCol" data-p="${bp}" data-i="${i}">✕</button></div></th>`).join("")}<th class="ctl"></th></tr>`;
+  const wsum=cols.reduce((x,c)=>x+(+c.w>0?+c.w:0),0); const unset=cols.filter(c=>!(+c.w>0)).length;
+  const wrow=`<tr class="wrow"><th class="ctl"><span class="wl">Width %</span></th>${cols.map((c,i)=>`<th><input type="number" min="2" max="90" step="1" data-p="${bp}.cols.${i}.w" value="${+c.w>0?+c.w:""}" placeholder="auto" aria-label="Width of ${esc(c.l)} in percent"></th>`).join("")}<th class="ctl"></th></tr>`;
+  const rows=b.rows.map((r,ri)=>`<tr class="s-${r.s||"n"}${ss.has(ri)?" picked":""}"><td class="ctl"><input type="checkbox" class="rsel" data-t="${b.id}" data-i="${ri}" ${ss.has(ri)?"checked":""} aria-label="Select row"><select data-p="${bp}.rows.${ri}.s" aria-label="Row style">${STY.map(([v,l])=>`<option value="${v}"${(r.s||"")===v?" selected":""}>${l}</option>`).join("")}</select></td>${cols.map((c,ci)=>c.calc?`<td><input disabled value="${esc(rowVals(cols,r.c)[ci])}"></td>`:`<td><input data-p="${bp}.rows.${ri}.c.${ci}" value="${esc(r.c[ci])}"></td>`).join("")}<td class="ctl">${mv(`${bp}.rows.${ri}`)}</td></tr>`).join("");
+  return `<div class="gwrap"><table class="g selt"><thead>${head}${wrow}</thead><tbody>${rows}</tbody></table></div>
+   <div class="selbar${ss.size?" on":""}" id="selbar-${b.id}"><b class="selcount">${ss.size} selected</b><button class="btn sm danger" data-act="delSel" data-p="${bp}">Delete selected</button><button class="btn sm" data-act="clearSel" data-p="${bp}">Clear selection</button><span class="hint" style="margin:0">Shift-click a checkbox to select a range.</span></div>
+   <div class="addbar"><button class="btn sm" data-act="addRow" data-p="${bp}">+ Row</button>${payrollCols(b)?`<button class="btn sm" data-act="combine" data-p="${bp}">Combine other states…</button>`:""}${COMBINE_UNDO[b.id]?`<button class="btn sm" data-act="undoCombine" data-p="${bp}">Undo combine</button>`:""}${nsub?`<button class="btn sm" data-act="delSub" data-p="${bp}">Remove all ${nsub} indented row${nsub>1?"s":""}</button>`:""}<button class="btn sm" data-act="addCol" data-p="${bp}">+ Column</button><button class="btn sm" data-act="fitCols" data-p="${bp}">Auto-fit widths to content</button>${chk("Total row",`${bp}.total`,b.total)}</div>
+   <p class="hint">Widths: ${wsum}% set${unset?`, ${unset} column${unset>1?"s":""} on auto`:""}.${!unset&&wsum!==100?" They'll be scaled to fill the page width.":""} Changing one column doesn't shrink the others. Lower a neighbor, or use auto-fit, to rebalance.</p>`;
 }
 function editorList(b,bp){
   const items=b.items.map((it,i)=>`<div class="litem${it.lv?" l1":""}"><button class="ibtn" title="${it.lv?"Outdent":"Indent"}" data-act="indent" data-p="${bp}.items.${i}">${it.lv?"⇤":"⇥"}</button><input class="inp" data-p="${bp}.items.${i}.t" value="${esc(it.t)}">${mv(`${bp}.items.${i}`)}</div>`).join("");
   return items+`<div class="addbar"><button class="btn sm" data-act="addItem" data-p="${bp}">+ Item</button></div><p class="hint">Wrap words in **double asterisks** for bold.</p>`;
 }
 function editorKV(b,bp){
-  return b.items.map((it,i)=>`<div class="litem"><input class="inp" style="flex:1" data-p="${bp}.items.${i}.k" value="${esc(it.k)}" placeholder="Label"><input class="inp" style="flex:1.4" data-p="${bp}.items.${i}.v" value="${esc(it.v)}" placeholder="Value">${mv(`${bp}.items.${i}`)}</div>`).join("")+`<div class="addbar"><button class="btn sm" data-act="addKV" data-p="${bp}">+ Line</button></div>`;
+  const s=getP(bp.split(".blocks.")[0]);
+  return b.items.map((it,i)=>`<div class="litem"><input class="inp" style="flex:1" data-p="${bp}.items.${i}.k" value="${esc(it.k)}" placeholder="Label">${isAudit(s,it)?`<input class="inp" style="flex:1.4" value="Annual" disabled title="Workers' comp audits always print as Annual">`:`<input class="inp" style="flex:1.4" data-p="${bp}.items.${i}.v" value="${esc(it.v)}" placeholder="Value">`}${mv(`${bp}.items.${i}`)}</div>`).join("")+`<div class="addbar"><button class="btn sm" data-act="addKV" data-p="${bp}">+ Line</button></div>`;
 }
 const BTYPE={table:"Table",bullets:"Bullet list",numbered:"Numbered list",text:"Paragraph",kv:"Label: value lines"};
 function editorStd(s,si){
@@ -614,15 +649,23 @@ function editorStd(s,si){
   return `<div class="card"><div class="row2">${fld("Section title",`${sp}.title`,s.title)}${fld("Proposed carrier",`${sp}.carrier`,s.carrier,"e.g. Brotherhood Mutual")}</div>${chk("Show proposed carrier line",`${sp}.showCarrier`,s.showCarrier)}${chk("Start on a new page",`${sp}.newPage`,s.newPage)}</div>
    ${blocks}<div class="addbar">${Object.entries(BTYPE).map(([k,v])=>`<button class="btn sm" data-act="addBlock" data-p="${sp}" data-type="${k}">+ ${v}</button>`).join("")}</div>`;
 }
+function premTotalRow(s){ const {eT,pT,pending,yoy}=premiumTotals(s); const plus=pending?"+":"";
+  return {exp:money(eT), prop:money(pT)?money(pT)+plus:(pending?"Pending":""), yoy}; }
+function refreshPremium(si){
+  const s=S.sections[si]; if(!s||s.kind!=="premium") return; const ed=$("#editor");
+  ed.querySelectorAll("tbody tr").forEach((tr,i)=>{ const y=tr.querySelector(".pyoy"); const r=s.rows[i]; if(y&&r) y.value=pct(num(r.expP),num(r.propP)); });
+  const t=premTotalRow(s); const set=(c,v)=>{ const el=ed.querySelector(c); if(el) el.value=v; };
+  set(".pt-exp",t.exp); set(".pt-prop",t.prop); set(".pt-yoy",t.yoy);
+}
 function editorPremium(s,si){
   const sp=`sections.${si}`; const ex=s.showExpiring;
-  const rows=s.rows.map((r,i)=>{ const rp=`${sp}.rows.${i}`; return `<tr><td class="ctl"></td><td><input data-p="${rp}.cov" value="${esc(r.cov)}"></td>${ex?`<td><input data-p="${rp}.expP" value="${esc(r.expP)}"></td><td><input data-p="${rp}.expC" value="${esc(r.expC)}"></td>`:""}<td><input data-p="${rp}.propP" value="${esc(r.propP)}"></td><td><input data-p="${rp}.propC" value="${esc(r.propC)}"></td>${ex?`<td><input disabled value="${esc(pct(num(r.expP),num(r.propP)))}"></td>`:""}<td class="ctl">${mv(rp)}</td></tr>`; }).join("");
-  const {eT,pT,pending}=premiumTotals(s);
+  const rows=s.rows.map((r,i)=>{ const rp=`${sp}.rows.${i}`; return `<tr><td><input data-p="${rp}.cov" value="${esc(r.cov)}"></td>${ex?`<td><input data-p="${rp}.expP" value="${esc(r.expP)}"></td><td><input data-p="${rp}.expC" value="${esc(r.expC)}"></td>`:""}<td><input data-p="${rp}.propP" value="${esc(r.propP)}"></td><td><input data-p="${rp}.propC" value="${esc(r.propC)}"></td>${ex?`<td><input disabled class="pyoy" value="${esc(pct(num(r.expP),num(r.propP)))}"></td>`:""}<td class="ctl">${mv(rp)}</td></tr>`; }).join("");
+  const tr=premTotalRow(s);
   return `<div class="card"><div class="row2">${fld("Section title",`${sp}.title`,s.title)}<div></div></div>${chk("Show expiring premium & carrier",`${sp}.showExpiring`,s.showExpiring)}${chk("Start on a new page",`${sp}.newPage`,s.newPage)}</div>
-   <div class="card"><div class="gwrap"><table class="g"><thead><tr><th class="ctl"></th><th>Coverage type</th>${ex?"<th>Expiring premium</th><th>Expiring carrier</th>":""}<th>Proposed premium</th><th>Proposed carrier</th>${ex?"<th>YoY</th>":""}<th class="ctl"></th></tr></thead><tbody>${rows}</tbody></table></div>
+   <div class="card"><div class="gwrap"><table class="g"><thead><tr><th style="min-width:170px">Coverage type</th>${ex?'<th style="min-width:105px">Expiring premium</th><th style="min-width:140px">Expiring carrier</th>':""}<th style="min-width:105px">Proposed premium</th><th style="min-width:140px">Proposed carrier</th>${ex?'<th style="min-width:80px">YoY</th>':""}<th class="ctl"></th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="ptot"><td><input disabled value="Total"></td>${ex?`<td><input disabled class="pt-exp" value="${esc(tr.exp)}"></td><td></td>`:""}<td><input disabled class="pt-prop" value="${esc(tr.prop)}"></td><td></td>${ex?`<td><input disabled class="pt-yoy" value="${esc(tr.yoy)}"></td>`:""}<td class="ctl"></td></tr></tfoot></table></div>
    <div class="addbar"><button class="btn sm" data-act="addPremRow" data-p="${sp}">+ Row</button></div>
-   <p class="hint">Lines without a premium don't print. Totals: ${ex?`expiring ${money(eT)||"—"}, `:""}proposed ${money(pT)||"—"}${pending?" + pending lines":""}. Anything that isn't a dollar amount (like TBD) prints in red and adds a “+” to the total.</p></div>
-   <div class="card">${area("Footnotes",`${sp}.foot`,s.foot,3)}</div>`;
+   <p class="hint">YoY and the total row recalculate as you type. Total YoY compares only lines that have both an expiring and a proposed premium. Enter premiums as plain numbers (17100) or dollars ($17,100); they're formatted when you leave the cell. Lines without a premium don't print. Anything that isn't a dollar amount (like TBD) prints in red and adds a “+” to the total.</p></div>
+   <div class="card">${area("Footnotes",`${sp}.foot`,s.foot,3)}<p class="hint">When the first footnote starts with a single *, the Proposed Premium heading gets a matching *.</p></div>`;
 }
 function editorAcceptance(s,si){
   const sp=`sections.${si}`;
@@ -665,6 +708,73 @@ function delCol(t,idx){
   t.cols.splice(idx,1); t.rows.forEach(r=>r.c.splice(idx,1));
   t.cols.forEach(c=>{ if(!c.calc) return; if(c.calc.of.includes(idx)) c.calc=null; else c.calc.of=c.calc.of.map(i=>i>idx?i-1:i); });
 }
+function fitWidths(t){
+  // Measures the actual text so number columns never wrap and text columns share what's left.
+  const dense=t.cols.length>=9, pt=dense?8:9.5, PX=96/72, W=7.4*96;
+  const ctx=document.createElement("canvas").getContext("2d");
+  const meas=(s,bold)=>{ ctx.font=`${bold?"bold ":""}${pt*PX}px Arial`; return ctx.measureText(String(s)).width; };
+  const pad=(dense?7:9)*PX;
+  const rows=t.rows.map(r=>rowVals(t.cols,r.c)); const tot=t.total?totalCells(t):null; if(tot) rows.push(tot);
+  const info=t.cols.map((c,i)=>{
+    const vals=rows.map(v=>String(v[i]==null?"":v[i])).filter(s=>s.trim()).map(s=>c.m&&!isNaN(num(s))?money(num(s)):s);
+    const numeric=c.m||!!c.calc||(vals.length>0&&vals.every(v=>!isNaN(num(v))||/^[+-]?\d+(\.\d+)?%$/.test(v)));
+    const head=Math.max(...String(c.l).split(/\s+/).map(w=>meas(w,true)));
+    const longest=Math.max(0,...vals.map(v=>meas(v)));
+    const word=Math.max(0,...vals.flatMap(v=>v.split(/\s+/)).map(w=>meas(w)));
+    const totW=tot&&String(tot[i]||"").trim()?meas(tot[i],true):0;
+    const min=Math.max(head,numeric?longest:word,totW,meas("00"))+pad;
+    return {min, ideal:numeric?min:Math.max(min,Math.min(longest+pad,2.4*96)), numeric};
+  });
+  let w=info.map(x=>x.ideal); const sum=a=>a.reduce((x,y)=>x+y,0);
+  if(sum(w)<W){ const flex=info.map((x,i)=>x.numeric?0:w[i]); const fs=sum(flex); const extra=W-sum(w); w=w.map((v,i)=>v+(fs?flex[i]/fs:1/w.length)*extra); }
+  else { let over=sum(w)-W; const room=info.map((x,i)=>x.numeric?0:Math.max(0,w[i]-x.min)); const rs=sum(room);
+    if(rs>0){ const take=Math.min(over,rs); w=w.map((v,i)=>v-room[i]/rs*take); over-=take; }
+    if(over>0){ const k=W/sum(w); w=w.map(v=>v*k); } }
+  const pctv=w.map(v=>Math.max(2,Math.round(v/W*100))); pctv[pctv.indexOf(Math.max(...pctv))]+=100-sum(pctv);
+  t.cols.forEach((c,i)=>c.w=pctv[i]);
+}
+const ST={AL:"Alabama",AK:"Alaska",AZ:"Arizona",AR:"Arkansas",CA:"California",CO:"Colorado",CT:"Connecticut",DE:"Delaware",DC:"District of Columbia",FL:"Florida",GA:"Georgia",HI:"Hawaii",ID:"Idaho",IL:"Illinois",IN:"Indiana",IA:"Iowa",KS:"Kansas",KY:"Kentucky",LA:"Louisiana",ME:"Maine",MD:"Maryland",MA:"Massachusetts",MI:"Michigan",MN:"Minnesota",MS:"Mississippi",MO:"Missouri",MT:"Montana",NE:"Nebraska",NV:"Nevada",NH:"New Hampshire",NJ:"New Jersey",NM:"New Mexico",NY:"New York",NC:"North Carolina",ND:"North Dakota",OH:"Ohio",OK:"Oklahoma",OR:"Oregon",PA:"Pennsylvania",RI:"Rhode Island",SC:"South Carolina",SD:"South Dakota",TN:"Tennessee",TX:"Texas",UT:"Utah",VT:"Vermont",VA:"Virginia",WA:"Washington",WV:"West Virginia",WI:"Wisconsin",WY:"Wyoming",PR:"Puerto Rico"};
+const AGG_LABEL="All Other States";
+function detectState(v){
+  const s=String(v||""); if(/all other states/i.test(s)) return null;
+  const codes=(s.match(/\b[A-Z]{2}\b/g)||[]).filter(c=>ST[c]); if(codes.length) return codes[0];
+  const low=s.toLowerCase(); for(const [k,n] of Object.entries(ST)) if(new RegExp("\\b"+n.toLowerCase()+"\\b").test(low)) return k;
+  return null;
+}
+function classKey(v){ const m=String(v||"").match(/\b(\d{4})\b/); return m?m[1]:String(v||"").trim().toLowerCase(); }
+function payrollCols(t){
+  const f=re=>t.cols.findIndex(c=>re.test(c.l));
+  const pi=f(/premise|state|location/i), ci=f(/class/i), yi=f(/payroll|remuneration/i);
+  return (pi>=0&&ci>=0&&yi>=0)?{pi,ci,yi}:null;
+}
+function stateSummary(t){
+  const {pi,yi}=payrollCols(t); const m=new Map(); let unknown=0;
+  t.rows.forEach(r=>{ const st=detectState(r.c[pi]); if(!st){ if(!/all other states/i.test(r.c[pi])&&(r.c[pi]||r.c[yi])) unknown++; return; } const g=m.get(st)||{st,rows:0,pay:0}; g.rows++; const n=num(r.c[yi]); if(!isNaN(n)) g.pay+=n; m.set(st,g); });
+  return {states:[...m.values()].sort((x,y)=>y.pay-x.pay), unknown};
+}
+function combineStates(t, keep){
+  const {pi,ci,yi}=payrollCols(t); const kept=[], groups=new Map();
+  t.rows.forEach(r=>{
+    const st=detectState(r.c[pi]); const agg=/all other states/i.test(r.c[pi]||"");
+    if(!agg&&(!st||keep.has(st))){ kept.push(r); return; }
+    const k=classKey(r.c[ci]); const g=groups.get(k)||{cls:r.c[ci],sum:0,any:false,s:r.s||""};
+    const n=num(r.c[yi]); if(!isNaN(n)){ g.sum+=n; g.any=true; } groups.set(k,g);
+  });
+  const agg=[...groups.values()].sort((x,y)=>classKey(x.cls).localeCompare(classKey(y.cls),undefined,{numeric:true})).map(g=>{ const c=Array(t.cols.length).fill(""); c[pi]=AGG_LABEL; c[ci]=g.cls; c[yi]=g.any?money(g.sum):""; return R(c,""); });
+  const before=t.rows.length; t.rows=[...kept,...agg]; return {before,after:t.rows.length,groups:agg.length};
+}
+const COMBINE_UNDO={}; let pendingCombine=null;
+function modalCombine(bp){
+  const t=getP(bp); const {states,unknown}=stateSummary(t);
+  if(states.length<2) return toast(states.length?"Only one state found, so there's nothing to combine.":"No state abbreviations found in the Premise column.");
+  pendingCombine=bp;
+  const rows=states.map((g,i)=>`<tr><td style="padding:5px 8px"><input type="radio" name="mainSt" value="${g.st}" ${i===0?"checked":""}></td><td style="padding:5px 8px"><input type="checkbox" class="keepSt" value="${g.st}"></td><td style="padding:5px 8px"><b>${g.st}</b> ${esc(ST[g.st])}</td><td style="padding:5px 8px;color:#667085">${g.rows} row${g.rows>1?"s":""}</td><td style="padding:5px 8px;text-align:right">${money(g.pay)||"—"}</td></tr>`).join("");
+  modal(`<h3>Combine other states</h3>
+   <p>The main state keeps its class-code detail. Every other state is rolled into <b>${AGG_LABEL}</b>, one row per class code, with payroll added together. Check <b>Keep</b> for any state with a physical campus that should stay broken out.</p>
+   <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="text-align:left;color:#475467"><th style="padding:5px 8px">Main</th><th style="padding:5px 8px">Keep</th><th style="padding:5px 8px">State</th><th></th><th style="padding:5px 8px;text-align:right">Payroll</th></tr></thead><tbody>${rows}</tbody></table>
+   ${unknown?`<p class="hint">${unknown} row${unknown>1?"s have":" has"} no recognizable state in the Premise column and will be left as is.</p>`:""}
+   <div class="mact"><button class="btn" data-m="close">Cancel</button><button class="btn dark" data-m="combine">Combine</button></div>`);
+}
 function insertSection(s){
   const si=secIndex();
   if(si>=0) S.sections.splice(si+1,0,s);
@@ -680,6 +790,16 @@ const ACT={
   addRow(el){ const t=getP(el.dataset.p); t.rows.push(R(Array(t.cols.length).fill(""))); },
   addCol(el){ const t=getP(el.dataset.p); t.cols.push(C("New column")); t.rows.forEach(r=>r.c.push("")); },
   delCol(el){ const t=getP(el.dataset.p); if(t.cols.length<2) return toast("A table needs at least one column."); delCol(t,+el.dataset.i); },
+  fitCols(el){ const t=getP(el.dataset.p); fitWidths(t); toast("Widths fitted to the current content. Adjust any column by hand."); },
+  delSel(el){ const t=getP(el.dataset.p); const ss=selOf(t.id); if(!ss.size) return "noop";
+    if(!confirm(`Delete ${ss.size} row${ss.size>1?"s":""} from this table?`)) return "noop";
+    t.rows=t.rows.filter((r,i)=>!ss.has(i)); ss.clear(); },
+  clearSel(el){ selOf(getP(el.dataset.p).id).clear(); renderEditor(); return "noop"; },
+  delSub(el){ const t=getP(el.dataset.p); const n=t.rows.filter(r=>r.s==="sub").length;
+    if(!confirm(`Remove all ${n} indented rows? Group headings stay so you can decide on them.`)) return "noop";
+    t.rows=t.rows.filter(r=>r.s!=="sub"); selOf(t.id).clear(); },
+  combine(el){ modalCombine(el.dataset.p); return "noop"; },
+  undoCombine(el){ const t=getP(el.dataset.p); if(!COMBINE_UNDO[t.id]) return "noop"; t.rows=COMBINE_UNDO[t.id]; delete COMBINE_UNDO[t.id]; selOf(t.id).clear(); toast("Combine undone."); },
   addItem(el){ getP(el.dataset.p).items.push({t:"",lv:0}); },
   addKV(el){ getP(el.dataset.p).items.push({k:"",v:""}); },
   indent(el){ const it=getP(el.dataset.p); it.lv=it.lv?0:1; },
@@ -703,26 +823,45 @@ const ACT={
   print(){ doPrint(); return "noop"; },
 };
 const STRUCT_NOOP=new Set(["select"]);
+function refreshSelUI(id){
+  const ss=selOf(id); const bar=document.getElementById("selbar-"+id); if(!bar) return;
+  bar.classList.toggle("on",ss.size>0); bar.querySelector(".selcount").textContent=ss.size+" selected";
+  document.querySelectorAll(`.rsel[data-t="${id}"]`).forEach(cb=>{ const on=ss.has(+cb.dataset.i); cb.checked=on; cb.closest("tr").classList.toggle("picked",on); });
+  const all=document.querySelector(`.rselAll[data-t="${id}"]`); const n=document.querySelectorAll(`.rsel[data-t="${id}"]`).length; if(all) all.checked=n>0&&ss.size===n;
+}
+document.addEventListener("click",e=>{
+  const cb=e.target.closest(".rsel,.rselAll"); if(!cb) return;
+  const id=cb.dataset.t; const ss=selOf(id);
+  if(cb.classList.contains("rselAll")){ const boxes=document.querySelectorAll(`.rsel[data-t="${id}"]`); if(cb.checked) boxes.forEach(b=>ss.add(+b.dataset.i)); else ss.clear(); }
+  else { const i=+cb.dataset.i; if(e.shiftKey&&SELLAST[id]!=null){ const [lo,hi]=[Math.min(i,SELLAST[id]),Math.max(i,SELLAST[id])]; for(let k=lo;k<=hi;k++){ cb.checked?ss.add(k):ss.delete(k); } } else { cb.checked?ss.add(i):ss.delete(i); } SELLAST[id]=i; }
+  refreshSelUI(id);
+},true);
 document.addEventListener("click",e=>{
   const el=e.target.closest("[data-act]"); if(!el) return;
   const a=el.dataset.act; if(!ACT[a]) return;
   e.preventDefault();
   const r=ACT[a](el);
   if(r==="noop"||STRUCT_NOOP.has(a)) return;
+  if(!["delSel","delSub"].includes(a)) Object.values(SELR).forEach(s=>s.clear());
   markDirty(); renderAll();
 });
 document.addEventListener("input",e=>{
   const el=e.target; if(!el.dataset||!el.dataset.p||el.type==="file") return;
-  setP(el.dataset.p, el.type==="checkbox"?el.checked:el.value); markDirty();
+  const val=el.type==="checkbox"?el.checked:/\.w$/.test(el.dataset.p)?(el.value===""?null:Math.min(90,Math.max(2,+el.value))):el.value;
+  setP(el.dataset.p, val); markDirty();
   if(el.type==="checkbox"||el.tagName==="SELECT"){ renderAll(); return; }
   if(/\.(title|carrier|insured)$/.test(el.dataset.p)) renderNav();
   if(/\.c\.\d+$/.test(el.dataset.p)){ // refresh calculated cells in the editor row without stealing focus
     const tp=el.dataset.p.split(".rows.")[0]; const t=getP(tp); const ri=+el.dataset.p.split(".rows.")[1].split(".")[0];
-    if(t.cols.some(c=>c.calc)){ const tr=el.closest("tr"); const dis=tr.querySelectorAll("input:disabled"); let k=0; t.cols.forEach(c=>{ if(c.calc&&dis[k]) dis[k++].value=calcCell(c,t.rows[ri].c); }); }
+    if(t.cols.some(c=>c.calc)){ const tr=el.closest("tr"); const dis=tr.querySelectorAll("input:disabled"); const v=rowVals(t.cols,t.rows[ri].c); let k=0; t.cols.forEach((c,ci)=>{ if(c.calc&&dis[k]) dis[k++].value=v[ci]; }); }
   }
+  const pm=el.dataset.p.match(/^sections\.(\d+)\.rows\.\d+\.(expP|propP)$/); if(pm) refreshPremium(+pm[1]);
   schedPreview();
 });
 document.addEventListener("change",e=>{
+  if(e.target.dataset&&/\.w$/.test(e.target.dataset.p||"")){ renderEditor(); return; }
+  const pm=(e.target.dataset&&e.target.dataset.p||"").match(/^sections\.(\d+)\.rows\.\d+\.(expP|propP|prem)$/);
+  if(pm){ const n=num(e.target.value); if(!isNaN(n)){ const f=money(n); if(f!==e.target.value){ e.target.value=f; setP(e.target.dataset.p,f); markDirty(); schedPreview(); } } return; }
   if(e.target.id==="addSel"){ const v=e.target.value; if(!v) return; insertSection(makeSection(v)); markDirty(); renderAll(); $("#navAdd").innerHTML=addSelectHTML(); scrollPreviewTo(sel); }
 });
 $("#zoom").addEventListener("input",e=>{ const z=e.target.value/100; document.documentElement.style.setProperty("--z",z); $("#zoomVal").textContent=e.target.value+"%"; });
@@ -760,6 +899,10 @@ $("#modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal()
   if(m==="copyPrompt"){ copyText(buildPrompt()).then(ok=>toast(ok?"Extraction instructions copied.":"Copy blocked — select the text and copy it manually.")); }
   if(m==="showPrompt"){ $("#promptBox").style.display="block"; $("#promptBox").value=buildPrompt(); }
   if(m==="import"){ doImport($("#impText").value); }
+  if(m==="combine"&&pendingCombine){ const t=getP(pendingCombine); const keep=new Set([...document.querySelectorAll(".keepSt:checked")].map(x=>x.value));
+    const main=document.querySelector('input[name="mainSt"]:checked'); if(main) keep.add(main.value);
+    COMBINE_UNDO[t.id]=clone(t.rows); const r=combineStates(t,keep); selOf(t.id).clear(); pendingCombine=null; closeModal(); markDirty(); renderAll();
+    toast(`${r.before} rows → ${r.after}. ${r.groups} combined class code${r.groups===1?"":"s"} under ${AGG_LABEL}.`); }
 });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
 function modalNew(){
@@ -805,9 +948,19 @@ Return ONLY one JSON object. No commentary, no markdown, no code fences.
 Rules:
 - Copy limits, deductibles, retentions, dates, and premiums exactly as the carrier shows them (keep $ signs and commas).
 - Never guess. If something is not in the document, leave it out or use "".
-- Only include sections for coverages that actually appear in this proposal.
-- For each table, list only rows that apply to this proposal, in the order a reader would expect. Use the example rows as naming guidance, not as required rows.
+- The source may be a carrier proposal, a quote, or a renewal declarations page. Treat them the same way.
+- Only include sections for coverages that actually appear in the document.
+- KEEP IT HIGH LEVEL. This is a client-facing summary, not a copy of the policy forms. For each coverage, give the headline limits (occurrence and aggregate for liability; the limit and deductible for property, crime, and inland marine).
+- Do NOT list supplemental payments, built-in sublimits, coverage extensions, or "additional coverages" that come automatically inside a coverage form. Include an extension only if it is a separately scheduled or endorsed coverage with its own limit, or it is one of the example rows for that section.
+- Do not use indented sub-rows, EXCEPT for these three, which keep their full detail:
+    1. Cyber ("cyber" section): list each insuring agreement as a group row with its sublimits and retentions as indented rows beneath it.
+    2. Defense Reimbursement (in "gl_addl"): a group row with each component (e.g., covered lawsuit, law enforcement inquiry) indented beneath it.
+    3. Hired and non-owned vehicle coverage (the "Non-Owned Vehicle Coverage" group in "gl_addl"): a group row with liability, medical payments, and physical damage indented beneath it, including any deductible.
+- Everywhere else, match the level of detail in the example rows. When in doubt, leave it out; the producer can add rows.
+- For each table, list only rows that apply, in the order a reader would expect. Use the example rows as naming guidance, not as required rows.
 - A row is an array of cell strings in column order. For a heading row with indented rows beneath it, use {"cells":[...],"style":"group"}; for the indented rows use {"cells":[...],"style":"sub"}.
+- Workers' compensation Rating Basis: start each Premise cell with the state's two-letter abbreviation (e.g. "IN" or "IN – Main Campus"), and put the class code first in the Classification cell (e.g. "8868 – Colleges: Professional Employees"). List every state and class code as shown; the producer will combine remote-worker states.
+- Workers' compensation audit requirement is always "Annual".
 - Premiums go in "premiums", one entry per line of coverage, using the annual premium shown.
 - Do not include client names of individuals, Social Security numbers, driver information, or bank details.
 
@@ -861,6 +1014,7 @@ function doImport(text){
     d.premiums.forEach(p=>{ if(!p||!p.coverage) return; const name=String(p.coverage); const row=ps.rows.find(r=>r.cov.toLowerCase()===name.toLowerCase());
       if(row){ row.propP=String(p.premium??""); if(p.carrier) row.propC=String(p.carrier); } else ps.rows.push({cov:name,expP:"",expC:"",propP:String(p.premium??""),propC:String(p.carrier??"")}); prem++; });
   }
+  Object.keys(COMBINE_UNDO).forEach(k=>delete COMBINE_UNDO[k]);
   closeModal(); markDirty(); renderAll();
   toast(`Imported: ${added} new section${added===1?"":"s"}, ${replaced} replaced, ${prem} premium line${prem===1?"":"s"}. Check every figure.`);
 }
