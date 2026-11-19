@@ -1178,7 +1178,8 @@ function modal(html){ $("#mbox").innerHTML=html; $("#modal").classList.add("on")
 function closeModal(){ $("#modal").classList.remove("on"); }
 $("#modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal(); const b=e.target.closest("[data-m]"); if(!b) return; const m=b.dataset.m;
   if(m==="close") return closeModal();
-  if(m.startsWith("start:")){ const k=(document.querySelector('input[name="nbKind"]:checked')||{}).value||"renewal"; S=freshState(m.slice(6),k); sel="cover"; markClean(); closeModal(); renderAll(); }
+  if(m==="openDraft"){ closeModal(); $("#fileIn").value=""; $("#fileIn").click(); return; }
+  if(m.startsWith("start:")){ const kEl=document.querySelector('input[name="nbKind"]:checked'); if(!kEl){ toast("Choose Renewal or New business first."); return; } const k=kEl.value; S=freshState(m.slice(6),k); sel="cover"; markClean(); closeModal(); renderAll(); }
   if(m==="copyPrompt"){ copyText(buildPrompt()).then(ok=>toast(ok?"Extraction instructions copied.":"Copy blocked — select the text and copy it manually.")); }
   if(m==="showPrompt"){ $("#promptBox").style.display="block"; $("#promptBox").value=buildPrompt(); }
   if(m==="import"){ doImport($("#impText").value); }
@@ -1188,15 +1189,15 @@ $("#modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal()
     toast(`${r.before} rows → ${r.after}. ${r.groups} combined class code${r.groups===1?"":"s"} under ${AGG_LABEL}.`); }
 });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
-function modalNew(){
-  if(dirty&&!confirm("You have unsaved changes. Start a new proposal anyway?")) return;
-  modal(`<h3>Start a new proposal</h3>
-   <div style="display:flex;gap:8px;margin:6px 0 12px"><label class="opt" style="flex:1;margin:0"><input type="radio" name="nbKind" value="renewal" checked><div><b>Renewal</b><span>Renewal confirmation page; expiring premium columns on.</span></div></label><label class="opt" style="flex:1;margin:0"><input type="radio" name="nbKind" value="new"><div><b>New business</b><span>Issuance confirmation page; expiring columns off.</span></div></label></div>
+function modalNew(first=false){
+  if(!first&&dirty&&!confirm("You have unsaved changes. Start a new proposal anyway?")) return;
+  modal(`<h3>${first?"What are you building today?":"Start a new proposal"}</h3>
+   <div style="display:flex;gap:8px;margin:6px 0 12px"><label class="opt" style="flex:1;margin:0"><input type="radio" name="nbKind" value="renewal"><div><b>Renewal</b><span>Renewal confirmation page; expiring premium columns on.</span></div></label><label class="opt" style="flex:1;margin:0"><input type="radio" name="nbKind" value="new"><div><b>New business</b><span>Issuance confirmation page; expiring columns off.</span></div></label></div>
    <p>Pick a starting layout. You can add, remove, and reorder sections afterward.</p>
    <button class="choice" data-m="start:empty"><b>Start lean (recommended with Import)</b><span>Cover, premium summary, options, binding, confirmation page, and e-delivery consent. Importing from Claude adds only the coverage sections in the carrier proposal.</span></button>
    <button class="choice" data-m="start:blanket"><b>Full template — blanket</b><span>Every section from the blanket Word template, with placeholders.</span></button>
    <button class="choice" data-m="start:scheduled"><b>Full template — scheduled values</b><span>Every section from the scheduled-values Word template, with placeholders.</span></button>
-   <div class="mact"><button class="btn" data-m="close">Cancel</button></div>`);
+   <div class="mact"><button class="btn" data-m="openDraft">Open a saved draft instead</button><button class="btn" data-m="close">${first?"Skip":"Cancel"}</button></div>`);
 }
 function modalImport(){
   modal(`<h3>Import from Claude</h3>
@@ -1348,6 +1349,7 @@ $("#navAdd").innerHTML=addSelectHTML();
 document.documentElement.style.setProperty("--z",.55);
 renderAll();
 window.addEventListener("load",loadSOI);
+modalNew(true);
 
 </script>
 <!-- PDF reader (Mozilla pdf.js, Apache-2.0), embedded so PDFs are read on this computer only -->
