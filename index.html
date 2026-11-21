@@ -417,10 +417,10 @@ function sec(preset,title,carrier,blocks,newPage=true){ return {id:uid(), kind:"
 const PRESETS = [
  {id:"locations", g:"Locations", name:"Schedule of locations (blanket)", make:()=>ls(sec("locations","Schedule of Locations",false,[
    T("",[C("Loc #",{a:"c",w:5}),C("Bldg #",{a:"c",w:5}),C("Building Name",{w:25}),C("Street Address",{w:28}),C("City",{w:16}),C("State",{a:"c",w:6}),C("Zip Code",{a:"c",w:9}),C("Blkt #",{a:"c",w:6})],
-     [R(["","","Mailing Address","","","","",""],"hl"),...blank(3,8)])]))},
+     [R(["-","","Mailing Address","[Mailing Address]","","","",""],"hl"),...blank(3,8)]),B("",[])]))},
  {id:"locations_values", g:"Locations", name:"Schedule of locations (scheduled values)", make:()=>ls(sec("locations_values","Schedule of Locations",false,[
    T("",[C("Loc #",{a:"c",w:4}),C("Bldg #",{a:"c",w:4.5}),C("Building Name",{w:18}),C("Street Address",{w:18}),C("City",{w:9}),C("State",{a:"c",w:4}),C("Zip",{a:"c",w:5.5}),C("Val.",{a:"c",w:4.5}),C("Building Limit",{a:"r",m:true,w:8}),C("Building Value",{a:"r",m:true,w:8,calc:{op:"broad",of:[8,7]}}),C("BPP",{a:"r",m:true,w:8.5}),C("Total",{a:"r",m:true,w:9,calc:{op:"sum",of:[9,10]}})],
-     [R(["-","","Mailing Address","[Mailing Address]","","","","","","","",""],"hl"),...blank(3,12)],{total:true})]))},
+     [R(["-","","Mailing Address","[Mailing Address]","","","","","","","",""],"hl"),...blank(3,12)],{total:true}),B("",[])]))},
  {id:"property_blanket", g:"Property", name:"Property (blanket)", make:()=>sec("property_blanket","Property",true,[
    T("",[C("Blanket #",{a:"c",w:9}),C("Blanket Type",{a:"c",w:27}),C("Limit",{a:"c",w:14}),C("Valuation",{a:"c",w:19}),C("Co-Insurance",{a:"c",w:15}),C("Perils",{a:"c",w:11})],
      [["1","[Blanket Description]","[Limit]","Replacement Cost*","Waived","Special"],["2","[Blanket Description]","[Limit]","Replacement Cost*","Waived","Special"]]),
@@ -746,7 +746,9 @@ const VAL_CODES=[["RC","Replacement Cost"],["BV","Broadened Valuation (building 
 function locNotes(s){
   const t=(s.blocks||[]).find(b=>b.type==="table"); if(!t) return "";
   const bi=t.cols.findIndex(c=>/^bldg/i.test(c.l)), vi=t.cols.findIndex(c=>/^val/i.test(c.l)); const out=[];
-  if(bi>=0&&t.rows.some(r=>/\*\s*$/.test(r.c[bi]||""))) out.push("*Actual Cash Value applies to the roof on buildings marked with an asterisk. This provision is automatically waived if the roof has been replaced in the last 10 years.");
+  const listTxt=(s.blocks||[]).filter(b=>b.type==="bullets"||b.type==="numbered").flatMap(b=>b.items.map(i=>i.t)).join(" ");
+  if(bi>=0&&t.rows.some(r=>/†/.test(r.c[bi]||""))&&!/†/.test(listTxt)) out.push("†A roof exclusion applies to buildings marked with a dagger. See the policy for details.");
+  if(bi>=0&&t.rows.some(r=>/\*/.test(r.c[bi]||""))) out.push("*Actual Cash Value applies to the roof on buildings marked with an asterisk. This provision is automatically waived if the roof has been replaced in the last 10 years.");
   if(vi>=0){ const used=new Set(t.rows.map(r=>String(r.c[vi]||"").trim().toUpperCase()).filter(Boolean));
     const L=VAL_CODES.filter(([k])=>used.has(k)); if(L.length) out.push("Valuation: "+L.map(([k,v])=>`${k} = ${v}`).join("; ")+"."); }
   return out.length?`<div class="blk locnote">${out.map(x=>`<p>${esc(x)}</p>`).join("")}</div>`:"";
@@ -844,6 +846,13 @@ function editorKV(b,bp){
   return b.items.map((it,i)=>`<div class="litem"><input class="inp" style="flex:1" data-p="${bp}.items.${i}.k" value="${esc(it.k)}" placeholder="Label">${isAudit(s,it)?`<input class="inp" style="flex:1.4" value="Annual" disabled title="Workers' comp audits always print as Annual">`:`<input class="inp" style="flex:1.4" data-p="${bp}.items.${i}.v" value="${esc(it.v)}" placeholder="Value">`}${mv(`${bp}.items.${i}`)}</div>`).join("")+`<div class="addbar"><button class="btn sm" data-act="addKV" data-p="${bp}">+ Line</button></div>`;
 }
 const BTYPE={table:"Table",bullets:"Bullet list",numbered:"Numbered list",text:"Paragraph",kv:"Label: value lines"};
+const isNB=()=>S.sections.some(o=>o.preset==="confirm_new");
+const MAILSRC={renewal:"page 1 of the renewal declarations",expiring:"page 1 of the expiring declarations",none:"no declarations, so it is blank"};
+function mailNeedsConfirm(s){ return !s.mailOk&&(isNB()||s.mailSrc!=="renewal"); }
+function mailCard(s,sp){
+  const src=s.mailSrc?`Mailing address came from ${MAILSRC[s.mailSrc]||s.mailSrc}.`:"Mailing address was entered by hand or the import didn't say where it came from.";
+  return `<div class="card"${mailNeedsConfirm(s)?' style="border-color:var(--yellow);background:#fffdf5"':""}><p class="hint" style="margin:0 0 6px">${esc(src)}${isNB()?" This is new business: confirm the mailing address with the client.":""}</p>${chk("Mailing address confirmed",`${sp}.mailOk`,s.mailOk)}</div>`;
+}
 function editorStd(s,si){
   const sp=`sections.${si}`;
   const blocks=s.blocks.map((b,bi)=>{ const bp=`${sp}.blocks.${bi}`;
@@ -851,6 +860,7 @@ function editorStd(s,si){
     return `<div class="card"><div class="chead"><span class="ctype">${BTYPE[b.type]}</span>${mv(bp)}</div><div class="f">${inp(`${bp}.heading`,b.heading,"Heading above this block (optional)")}</div>${body}</div>`; }).join("");
   return `<div class="card"><div class="row2">${fld("Section title",`${sp}.title`,s.title)}${fld(s.inForce?"Carrier":"Proposed carrier",`${sp}.carrier`,s.carrier,"e.g. Brotherhood Mutual")}</div>${chk("Show carrier line",`${sp}.showCarrier`,s.showCarrier)}${chk("Policy already in force (not a quote)",`${sp}.inForce`,s.inForce)}${chk("Start on a new page",`${sp}.newPage`,s.newPage)}${chk("Landscape page (room for more columns)",`${sp}.landscape`,s.landscape)}
    ${s.inForce?`<div class="row2" style="margin-top:8px">${fld("Policy term",`${sp}.term`,s.term,"e.g. 3.1.2026-3.1.2027")}<div></div></div><p class="hint" style="margin-top:0">Prints “Carrier” instead of “Proposed Carrier,” plus the policy term. On the Premium Summary, mark this line In force so its premium moves to a footnote.</p>`:""}</div>
+   ${/^locations/.test(s.preset)?mailCard(s,sp):""}
    ${blocks}<div class="addbar">${Object.entries(BTYPE).map(([k,v])=>`<button class="btn sm" data-act="addBlock" data-p="${sp}" data-type="${k}">+ ${v}</button>`).join("")}</div>`;
 }
 function premTotalRow(s){ const {eT,pT,pending,yoy}=premiumTotals(s); const plus=pending?"+":"";
@@ -1271,8 +1281,10 @@ Rules:
 - EXPIRING documents: if any document covers the expiring (prior) policy period, use it for exactly two things. (1) Total insured value: work out the change in TIV (all building plus business personal property limits) and put this sentence first in the property section's notes list: "**Total insured value (TIV) is $X, a Y% increase over expiring.**" (say "decrease" if it went down; round to one decimal). (2) Expiring premiums: for each line in "premiums", add "expiringPremium" (the expiring annual premium) and "expiringCarrier" (the expiring carrier), using the same coverage name as the proposed line. If a line appears only on the expiring documents, still list it with "premium": "". Take everything else from the renewal or proposed documents. If no expiring documents are included, leave out the TIV sentence and the expiring fields.
 - Additional named insureds: if any are shown, include a General Liability note "Additional Named Insureds: name; name; name".
 - Property structure: decide whether the property is BLANKET (the declarations show one or more blanket limits or blanket numbers covering buildings or contents) or SCHEDULED (each building has its own limit). If the producer's message says "blanket" or "scheduled", follow that. Set "propertyStructure" to "blanket" or "scheduled" (leave it out if there's no property). Blanket uses ONLY "locations" + "property_blanket"; scheduled uses ONLY "locations_values" + "property_scheduled". Never mix them.
+- Mailing address: the first row of the schedule of locations is the named insured's MAILING address, taken from page 1 of the declarations (the address under the named insured). Use the renewal or proposed declarations; if only expiring declarations have it, use those. Never use a building or location address, and never take it from a proposal. Put the street in Street Address and fill City, State, and Zip. If no declarations are included, leave the street as "[Mailing Address]". Set "mailingAddressSource" to "renewal", "expiring", or "none".
 - Schedule of locations ("locations" or "locations_values"): one row per building, plus the mailing address row first. Write its table as an object with the column names you used: {"columns": ["Loc #","Bldg #", ...], "rows": [[...], ...]}, using the column names listed for that section, in the same order as each row's cells.
     • Roofs at actual cash value: if a building's roof is valued at actual cash value, add "*" to the end of its Bldg # (e.g. "2*"). In "property_ext", set texts[0] to the roof sentence with those buildings listed; if no roofs are at actual cash value, set texts[0] to "".
+    • Roof exclusions: if a building has a roof exclusion or limitation (e.g. cosmetic damage, roof surfacing, wind/hail to the roof), add "†" to the end of its Bldg # (after any "*", e.g. "2*†"). In lists[0] for that schedule, add one note per exclusion, starting with "†", describing it in plain words and naming the buildings, e.g. "†Cosmetic damage to roof surfacing is excluded: Loc 1 Bldg 2; Loc 2 Bldg 1." Leave lists[0] out if there are none.
     • PITO (property in the open): list each PITO item as its own row under its location, with "(PITO)" at the end of the Building Name (e.g. "Playground Equipment (PITO)"; use "Property in the Open (PITO)" if the carrier gives no description) and the Bldg # the carrier shows. In "locations_values", put its limit in Building Limit, and its valuation in Val.
     • Valuation ("locations_values" only): put a code in the Val. column for every building: RC (replacement cost), BV (broadened valuation), ACV (actual cash value), FRC (functional replacement cost), or AV (agreed value). Put the building limit exactly as the carrier states it in Building Limit; do not multiply it. Leave the calculated columns as "" (the builder applies the 125% for BV).
     • Blanket coverage: give each blanket's valuation in the "property_blanket" Valuation column (e.g. "Replacement Cost*"). Broadened valuation never applies to a blanket.
@@ -1305,6 +1317,7 @@ JSON shape:
 {
   "instructionsVersion": "2026-11-21",
   "propertyStructure": "blanket",
+  "mailingAddressSource": "renewal",
   "cover": {"insured": "Named insured", "dates": "M.D.YYYY-M.D.YYYY"},
   "sections": [
     {"preset": "<id from list>", "carrier": "<carrier name>",
@@ -1342,7 +1355,8 @@ const STRUCT_SWAP={blanket:{locations_values:"locations",property_scheduled:"pro
 function doImport(text, structChoice="auto"){
   let d; try{ d=extractJSON(text); }catch(err){ return toast(err.message.startsWith("No JSON")?err.message:"Couldn't read that as JSON. Copy Claude's entire reply and try again."); }
   let added=0, replaced=0, prem=0; const warn=[];
-  if(d.instructionsVersion!==INSTR_VERSION) warn.push("Claude's reply came from out-of-date project instructions. Replace the project instructions (Import → Copy extraction instructions) and run it again.");
+  const newFmt=d.instructionsVersion===INSTR_VERSION||"propertyStructure" in d||"mailingAddressSource" in d||(d.premiums||[]).some(p=>p&&("expiringPremium" in p))||(d.sections||[]).some(x=>(x.tables||[]).some(t=>t&&!Array.isArray(t)&&Array.isArray(t.columns)));
+  if(!newFmt) warn.push("Claude's reply came from out-of-date project instructions. Replace the project instructions (Import → Copy extraction instructions) and run it again.");
   const struct=structChoice!=="auto"?structChoice:(["blanket","scheduled"].includes(d.propertyStructure)?d.propertyStructure:"auto");
   if(structChoice!=="auto"&&["blanket","scheduled"].includes(d.propertyStructure)&&d.propertyStructure!==structChoice) warn.push(`Claude read the property as ${d.propertyStructure}; imported as ${structChoice} per your choice. Check the schedule.`);
   if(d.cover&&typeof d.cover==="object"){ if(d.cover.insured&&!S.cover.insured) S.cover.insured=String(d.cover.insured); if(d.cover.dates&&!S.cover.dates) S.cover.dates=String(d.cover.dates); }
@@ -1354,6 +1368,7 @@ function doImport(text, structChoice="auto"){
       if(x.preset==="property_scheduled"||x.preset==="property_blanket"){ const notes=(x.lists||[])[0]; x={...x,tables:undefined,lists:notes?[notes]:undefined}; heads0=null; } }
     const s=makeSection(x.preset, struct==="scheduled"?"scheduled":undefined); if(x.carrier) s.carrier=String(x.carrier);
     if(x.inForce){ s.inForce=true; if(x.term) s.term=String(x.term); }
+    if(/^locations/.test(s.preset)){ const ms=String(d.mailingAddressSource||"").toLowerCase(); s.mailSrc=/renew/.test(ms)?"renewal":/expir/.test(ms)?"expiring":ms?"none":""; if(s.mailSrc!=="renewal"||isNB()) warn.push(s.mailSrc==="expiring"?"The mailing address came from the expiring declarations. Confirm it hasn't changed.":s.mailSrc==="renewal"?"New business: confirm the mailing address with the client.":"No declarations page was included, so the mailing address is blank. Add it and confirm it with the client."); }
     if(x.preset==="custom"){ if(x.title) s.title=String(x.title).slice(0,120);
       if(Array.isArray(x.columns)&&x.columns.length>=2&&x.columns.length<=8){ const tb=s.blocks[0]; tb.cols=x.columns.map(c=>C(String(c))); tb.rows=[]; } }
     const k={table:0,list:0,text:0,kv:0};
@@ -1396,7 +1411,7 @@ function placeholders(){
   const scan=(v,where)=>{ if(typeof v==="string"){ const m=v.match(re); if(m) m.forEach(x=>found.push(where+": "+x)); } else if(v&&typeof v==="object") Object.values(v).forEach(x=>scan(x,where)); };
   ["title","insured","dates"].forEach(k=>scan(S.cover[k],"Cover"));
   if(!S.cover.insured) found.push("Cover: insured name is blank");
-  S.sections.forEach(s=>{ if(s.kind==="consent"||s.kind==="confirm") return; scan(s.blocks||s.rows,s.title); if(s.kind==="std"&&s.showCarrier&&!s.carrier) found.push(s.title+": proposed carrier is blank"); });
+  S.sections.forEach(s=>{ if(s.kind==="consent"||s.kind==="confirm") return; scan(s.blocks||s.rows,s.title); if(s.kind==="std"&&s.showCarrier&&!s.carrier) found.push(s.title+": proposed carrier is blank"); if(/^locations/.test(s.preset)&&mailNeedsConfirm(s)) found.push(s.title+": confirm the mailing address"+(isNB()?" with the client (new business)":"")+", then tick “Mailing address confirmed”"); });
   return found;
 }
 function doPrint(){
