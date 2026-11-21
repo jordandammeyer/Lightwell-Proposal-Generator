@@ -1208,7 +1208,7 @@ $("#modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal()
   if(m.startsWith("start:")){ const kEl=document.querySelector('input[name="nbKind"]:checked'); if(!kEl){ toast("Choose Renewal or New business first."); return; } const k=kEl.value; S=freshState(m.slice(6),k); sel="cover"; markClean(); closeModal(); renderAll(); }
   if(m==="copyPrompt"){ copyText(buildPrompt()).then(ok=>toast(ok?"Extraction instructions copied.":"Copy blocked — select the text and copy it manually.")); }
   if(m==="showPrompt"){ $("#promptBox").style.display="block"; $("#promptBox").value=buildPrompt(); }
-  if(m==="import"){ doImport($("#impText").value); }
+  if(m==="import"){ const r=document.querySelector('input[name="impStruct"]:checked'); doImport($("#impText").value, r?r.value:"auto"); }
   if(m==="combine"&&pendingCombine){ const t=getP(pendingCombine); const keep=new Set([...document.querySelectorAll(".keepSt:checked")].map(x=>x.value));
     const main=document.querySelector('input[name="mainSt"]:checked'); if(main) keep.add(main.value);
     COMBINE_UNDO[t.id]=clone(t.rows); const r=combineStates(t,keep); selOf(t.id).clear(); pendingCombine=null; closeModal(); markDirty(); renderAll();
@@ -1225,11 +1225,17 @@ function modalNew(first=false){
    <button class="choice" data-m="start:scheduled"><b>Full template — scheduled values</b><span>Every section from the scheduled-values Word template, with placeholders.</span></button>
    <div class="mact"><button class="btn" data-m="openDraft">Open a saved draft instead</button><button class="btn" data-m="close">${first?"Skip":"Cancel"}</button></div>`);
 }
+function guessStruct(){ const p=S.sections.map(s=>s.preset); if(p.includes("locations")||p.includes("property_blanket")) return "blanket"; if(p.includes("locations_values")||p.includes("property_scheduled")) return "scheduled"; return "auto"; }
 function modalImport(){
   modal(`<h3>Import from Claude</h3>
    <p><b>1.</b> Start a new chat in the Lightwell proposal extraction project, using Sonnet. <b>2.</b> Upload the carrier proposal, the declarations pages, or both. For a renewal TIV comparison, add the expiring property declarations. <b>3.</b> Copy Claude's whole reply and paste it here.</p>
    <div class="mact" style="justify-content:flex-start;margin:0 0 10px"><button class="btn" data-m="copyPrompt">Copy extraction instructions</button><button class="btn" data-m="showPrompt">Show instructions</button></div>
    <textarea id="promptBox" readonly style="display:none;min-height:140px;margin-bottom:10px"></textarea>
+   <div class="f" style="margin:0 0 10px"><b style="display:block;margin-bottom:4px;color:var(--navy)">Property on this account</b>
+     <label class="chk" style="margin-right:14px"><input type="radio" name="impStruct" value="blanket"${guessStruct()==="blanket"?" checked":""}> Blanket</label>
+     <label class="chk" style="margin-right:14px"><input type="radio" name="impStruct" value="scheduled"${guessStruct()==="scheduled"?" checked":""}> Scheduled values</label>
+     <label class="chk"><input type="radio" name="impStruct" value="auto"${guessStruct()==="auto"?" checked":""}> Not sure / no property</label>
+     <p class="hint" style="margin:4px 0 0">Tip: also type “blanket” or “scheduled” in your message to Claude when you upload.</p></div>
    <textarea id="impText" placeholder="Paste Claude's JSON reply here"></textarea>
    <p class="hint">Imported sections replace sections of the same type. Premium lines merge into the premium summary. Review every number against the carrier proposal before printing.</p>
    <div class="mact"><button class="btn" data-m="close">Cancel</button><button class="btn dark" data-m="import">Import</button></div>`);
@@ -1255,7 +1261,7 @@ function buildPrompt(){
   });
   return `You are extracting data from an insurance carrier proposal so it can be loaded into Lightwell Insurance Advisors' proposal builder.
 
-Return ONLY one JSON object. No commentary, no markdown, no code fences.
+Return ONLY one JSON object. No commentary, no markdown, no code fences. Always include "instructionsVersion": "2026-11-21" exactly as shown.
 
 Rules:
 - Copy limits, deductibles, retentions, dates, and premiums exactly as the carrier shows them (keep $ signs and commas).
@@ -1264,11 +1270,13 @@ Rules:
 - When a proposal and declarations disagree on limits or premium, use the proposal (it is the offer being presented). Use the declarations for details a proposal often leaves out: additional named insureds, auto coverage symbols, and schedules of locations, buildings, and vehicles.
 - EXPIRING documents: if any document covers the expiring (prior) policy period, use it for exactly two things. (1) Total insured value: work out the change in TIV (all building plus business personal property limits) and put this sentence first in the property section's notes list: "**Total insured value (TIV) is $X, a Y% increase over expiring.**" (say "decrease" if it went down; round to one decimal). (2) Expiring premiums: for each line in "premiums", add "expiringPremium" (the expiring annual premium) and "expiringCarrier" (the expiring carrier), using the same coverage name as the proposed line. If a line appears only on the expiring documents, still list it with "premium": "". Take everything else from the renewal or proposed documents. If no expiring documents are included, leave out the TIV sentence and the expiring fields.
 - Additional named insureds: if any are shown, include a General Liability note "Additional Named Insureds: name; name; name".
-- Schedule of locations ("locations" or "locations_values"): one row per building, plus the mailing address row first.
+- Property structure: decide whether the property is BLANKET (the declarations show one or more blanket limits or blanket numbers covering buildings or contents) or SCHEDULED (each building has its own limit). If the producer's message says "blanket" or "scheduled", follow that. Set "propertyStructure" to "blanket" or "scheduled" (leave it out if there's no property). Blanket uses ONLY "locations" + "property_blanket"; scheduled uses ONLY "locations_values" + "property_scheduled". Never mix them.
+- Schedule of locations ("locations" or "locations_values"): one row per building, plus the mailing address row first. Write its table as an object with the column names you used: {"columns": ["Loc #","Bldg #", ...], "rows": [[...], ...]}, using the column names listed for that section, in the same order as each row's cells.
     • Roofs at actual cash value: if a building's roof is valued at actual cash value, add "*" to the end of its Bldg # (e.g. "2*"). In "property_ext", set texts[0] to the roof sentence with those buildings listed; if no roofs are at actual cash value, set texts[0] to "".
     • PITO (property in the open): list each PITO item as its own row under its location, with "(PITO)" at the end of the Building Name (e.g. "Playground Equipment (PITO)"; use "Property in the Open (PITO)" if the carrier gives no description) and the Bldg # the carrier shows. In "locations_values", put its limit in Building Limit, and its valuation in Val.
     • Valuation ("locations_values" only): put a code in the Val. column for every building: RC (replacement cost), BV (broadened valuation), ACV (actual cash value), FRC (functional replacement cost), or AV (agreed value). Put the building limit exactly as the carrier states it in Building Limit; do not multiply it. Leave the calculated columns as "" (the builder applies the 125% for BV).
     • Blanket coverage: give each blanket's valuation in the "property_blanket" Valuation column (e.g. "Replacement Cost*"). Broadened valuation never applies to a blanket.
+- Large uploads: work through every document before answering. Don't stop early or summarize; a missing premium or schedule row is worse than a long reply.
 - Commercial auto: copy each coverage's symbol from the declarations into the Symbol column (e.g. "1 – Any Auto", "2 – Owned Autos Only").
 - Only include sections for coverages that actually appear in the documents.
 - If a coverage has no matching section below (for example accident medical, a stand-alone abuse policy, or travel coverage), still include it: use "preset": "custom" with a "title" (e.g. "Volunteer Accident") and optional "columns" (e.g. ["Coverage","Limit","Deductible"]), then put its rows in tables[0]. Never drop a coverage just because there's no section for it, and never list a premium without also listing its coverage.
@@ -1295,6 +1303,8 @@ Rules:
 
 JSON shape:
 {
+  "instructionsVersion": "2026-11-21",
+  "propertyStructure": "blanket",
   "cover": {"insured": "Named insured", "dates": "M.D.YYYY-M.D.YYYY"},
   "sections": [
     {"preset": "<id from list>", "carrier": "<carrier name>",
@@ -1321,19 +1331,37 @@ function extractJSON(text){
   const a=t.indexOf("{"), b=t.lastIndexOf("}"); if(a<0||b<a) throw new Error("No JSON object found in what you pasted.");
   return JSON.parse(t.slice(a,b+1));
 }
-function doImport(text){
+const INSTR_VERSION="2026-11-21";
+const COL_ALIAS={loc:"loc",location:"loc",locno:"loc",bldg:"bldg",building:"buildinglimit",bldgno:"bldg",buildingno:"bldg",buildingnumber:"bldg",name:"buildingname",description:"buildingname",address:"streetaddress",street:"streetaddress",st:"state",zipcode:"zip",postalcode:"zip",val:"val",valuation:"val",blkt:"blkt",blanket:"blkt",blanketno:"blkt",blanketnumber:"blkt",contents:"bpp",businesspersonalproperty:"bpp",limit:"buildinglimit"};
+const nKey=l=>{ const k=String(l||"").toLowerCase().replace(/#/g,"no").replace(/[^a-z0-9]/g,""); return COL_ALIAS[k]||k; };
+function mapByHeader(cols, heads, rows){
+  const tk=cols.map(c=>nKey(c.l)); const idx=heads.map(h=>{ const k=nKey(h); let i=tk.indexOf(k); if(i<0) i=tk.findIndex(t=>t===k.replace(/no$/,"")); return (i>=0&&!cols[i].calc)?i:-1; });
+  return rows.map(r=>{ const cells=Array.isArray(r)?r:(r&&r.cells)||[]; const out=Array(cols.length).fill(""); idx.forEach((ti,si)=>{ if(ti>=0&&cells[si]!=null) out[ti]=String(cells[si]); }); return Array.isArray(r)?out:{cells:out,style:r.style}; });
+}
+const STRUCT_SWAP={blanket:{locations_values:"locations",property_scheduled:"property_blanket"},scheduled:{locations:"locations_values",property_blanket:"property_scheduled"}};
+function doImport(text, structChoice="auto"){
   let d; try{ d=extractJSON(text); }catch(err){ return toast(err.message.startsWith("No JSON")?err.message:"Couldn't read that as JSON. Copy Claude's entire reply and try again."); }
-  let added=0, replaced=0, prem=0;
+  let added=0, replaced=0, prem=0; const warn=[];
+  if(d.instructionsVersion!==INSTR_VERSION) warn.push("Claude's reply came from out-of-date project instructions. Replace the project instructions (Import → Copy extraction instructions) and run it again.");
+  const struct=structChoice!=="auto"?structChoice:(["blanket","scheduled"].includes(d.propertyStructure)?d.propertyStructure:"auto");
+  if(structChoice!=="auto"&&["blanket","scheduled"].includes(d.propertyStructure)&&d.propertyStructure!==structChoice) warn.push(`Claude read the property as ${d.propertyStructure}; imported as ${structChoice} per your choice. Check the schedule.`);
   if(d.cover&&typeof d.cover==="object"){ if(d.cover.insured&&!S.cover.insured) S.cover.insured=String(d.cover.insured); if(d.cover.dates&&!S.cover.dates) S.cover.dates=String(d.cover.dates); }
   (Array.isArray(d.sections)?d.sections:[]).forEach(x=>{
     if(!x||!P[x.preset]||["premium","acceptance","consent","confirm_renewal","confirm_new"].includes(x.preset)) return;
-    const s=makeSection(x.preset); if(x.carrier) s.carrier=String(x.carrier);
+    // coerce blanket/scheduled sections to the chosen structure (positional rows keep their original column names)
+    let heads0=null;
+    if(struct!=="auto"&&STRUCT_SWAP[struct][x.preset]){ const orig=P[x.preset].make(); heads0=orig.blocks.filter(b=>b.type==="table").map(b=>b.cols.map(c=>c.l)); x={...x,preset:STRUCT_SWAP[struct][x.preset]};
+      if(x.preset==="property_scheduled"||x.preset==="property_blanket"){ const notes=(x.lists||[])[0]; x={...x,tables:undefined,lists:notes?[notes]:undefined}; heads0=null; } }
+    const s=makeSection(x.preset, struct==="scheduled"?"scheduled":undefined); if(x.carrier) s.carrier=String(x.carrier);
     if(x.inForce){ s.inForce=true; if(x.term) s.term=String(x.term); }
     if(x.preset==="custom"){ if(x.title) s.title=String(x.title).slice(0,120);
       if(Array.isArray(x.columns)&&x.columns.length>=2&&x.columns.length<=8){ const tb=s.blocks[0]; tb.cols=x.columns.map(c=>C(String(c))); tb.rows=[]; } }
     const k={table:0,list:0,text:0,kv:0};
     s.blocks.forEach(b=>{
-      if(b.type==="table"){ const src=(x.tables||[])[k.table++]; if(Array.isArray(src)) b.rows=src.map(r=>rowFrom(r,b.cols.length)); }
+      if(b.type==="table"){ const ti=k.table++; let src=(x.tables||[])[ti];
+        if(src&&!Array.isArray(src)&&Array.isArray(src.rows)) src=Array.isArray(src.columns)&&src.columns.length?mapByHeader(b.cols,src.columns,src.rows):src.rows;
+        else if(Array.isArray(src)&&heads0&&heads0[ti]) src=mapByHeader(b.cols,heads0[ti],src);
+        if(Array.isArray(src)) b.rows=src.map(r=>rowFrom(r,b.cols.length)); }
       else if(b.type==="bullets"||b.type==="numbered"){ const src=(x.lists||[])[k.list++]; if(Array.isArray(src)) b.items=src.map(t=>({t:String(t),lv:0})); }
       else if(b.type==="text"){ const src=(x.texts||[])[k.text++]; if(typeof src==="string") b.text=src; }
       else if(b.type==="kv"){ const src=(x.fields||[])[k.kv++]; if(Array.isArray(src)) b.items=src.filter(Array.isArray).map(([kk,v])=>({k:String(kk??""),v:String(v??"")})); }
@@ -1348,13 +1376,16 @@ function doImport(text){
     ps.rows=ps.rows.filter(r=>r.cov||r.propP||r.expP);
     d.premiums.forEach(p=>{ if(!p||!p.coverage) return; const name=String(p.coverage); const row=ps.rows.find(r=>r.cov.toLowerCase()===name.toLowerCase());
       const r2=row||{cov:name,expP:"",expC:"",propP:"",propC:""}; if(p.premium!=null||!row) r2.propP=String(p.premium??""); if(p.carrier) r2.propC=String(p.carrier);
+      if(p.expiringPremium==null&&p.expiring_premium!=null) p.expiringPremium=p.expiring_premium; if(!p.expiringCarrier&&p.expiring_carrier) p.expiringCarrier=p.expiring_carrier;
       if(p.expiringPremium!=null&&String(p.expiringPremium).trim()){ r2.expP=String(p.expiringPremium); ps.showExpiring=true; } if(p.expiringCarrier) r2.expC=String(p.expiringCarrier);
       if(p.inForce){ r2.inForce=true; if(p.term) r2.term=String(p.term); }
       if(!row) ps.rows.push(r2); prem++; });
   }
   Object.keys(COMBINE_UNDO).forEach(k=>delete COMBINE_UNDO[k]);
   closeModal(); markDirty(); renderAll();
-  toast(`Imported: ${added} new section${added===1?"":"s"}, ${replaced} replaced, ${prem} premium line${prem===1?"":"s"}. Check every figure.`);
+  const expN=(d.premiums||[]).filter(p=>p&&p.expiringPremium!=null&&String(p.expiringPremium).trim()).length;
+  toast(`Imported: ${added} new section${added===1?"":"s"}, ${replaced} replaced, ${prem} premium line${prem===1?"":"s"}${expN?` (${expN} with expiring premium)`:""}. Check every figure.`);
+  if(warn.length) setTimeout(()=>modal(`<h3>Check this import</h3>${warn.map(w=>`<p>${esc(w)}</p>`).join("")}<div class="mact"><button class="btn dark" data-m="close">OK</button></div>`),50);
 }
 
 /* ===================================================================
