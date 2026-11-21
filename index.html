@@ -280,6 +280,13 @@ table.t tr.s-total td{border-top:1.25pt solid #444}
 .cform .csign h4{font-size:11pt}
 .cform .ag.sig4{display:grid;grid-template-columns:2.2fr 1.6fr 1.3fr .8fr;gap:10pt;margin-top:5pt}
 .cform .ret{font-size:7.4pt;font-style:italic;color:#666;margin-top:5pt}
+.locnote p{font-size:8.5pt;margin:0 0 3pt}
+.sec.ls table.t.dense{font-size:8.5pt}
+.sec.ls table.t.dense th{font-size:8.5pt}
+/* landscape sections: 11in wide; prints on its own landscape page */
+#pv .sec.ls{width:11in;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.35);border-top:none;margin:22pt 0;padding:.55in 0 .7in;position:relative}
+#pv .sec.ls.ls::before{content:"Landscape page";position:absolute;top:6pt;right:.55in;font-size:7pt;color:#98a2b3;letter-spacing:.5pt;display:block}
+#pv .sec.ls+.sec{border-top:1px dashed #c6cbd4;padding-top:14pt}
 /* preview-only page-break marker */
 #pv .sec.np{position:relative}
 #pv .sec.np::before{content:"New page";position:absolute;top:-13pt;right:.55in;font-size:7pt;color:#98a2b3;letter-spacing:.5pt}
@@ -296,6 +303,7 @@ table.t tr.s-total td{border-top:1.25pt solid #444}
 }
 @page cov{margin:0;@bottom-left{content:none;border:none}@bottom-center{content:none;border:none}@bottom-right{content:none;border:none}}
 @page form{margin:.4in 0 .78in 0}
+@page land{size:letter landscape}
 @page ins{margin:0;@bottom-left{content:none;border:none}@bottom-center{content:none;border:none}@bottom-right{content:none;border:none}}
 @media print{
   html,body{background:#fff;height:auto}
@@ -308,6 +316,8 @@ table.t tr.s-total td{border-top:1.25pt solid #444}
   .insert+.insert{break-before:page;page-break-before:always}
   .pvonly{display:none!important}
   .sec.cfp{page:form}
+  .sec.ls{page:land;width:11in;margin-top:0!important;break-before:page;page-break-before:always}
+  .sec.ls+.sec{break-before:page;page-break-before:always;margin-top:0}
   .sec.np{break-before:page;page-break-before:always}
   .sec.np:first-child{break-before:auto;page-break-before:auto}
   .sec{margin-top:16pt}
@@ -374,14 +384,20 @@ function calcCell(col, cells){
   const v=i=>num(cells[i]);
   if(col.calc.op==="sum"){ const vals=col.calc.of.map(v); if(vals.every(isNaN)) return ""; return money(vals.reduce((a,b)=>a+(isNaN(b)?0:b),0)); }
   if(col.calc.op==="yoy"){ return pct(v(col.calc.of[0]), v(col.calc.of[1])); }
+  if(col.calc.op==="broad"){ const base=v(col.calc.of[0]); if(isNaN(base)) return ""; return money(isBroad(cells[col.calc.of[1]])?base*1.25:base); }
   return "";
 }
 
+function isBroad(x){ return /(^|[^a-z])bv([^a-z]|$)|broad/i.test(String(x||"")); }
 function rowVals(cols,cells){ const v=cells.slice(); cols.forEach((c,i)=>{ if(c.calc) v[i]=calcCell(c,v); }); return v; }
 function totalCells(t){
   const cols=t.cols;
   const sums=cols.map((c,i)=>{ if(!c.m||c.calc) return ""; const vals=t.rows.map(r=>num(r.c[i])); return vals.every(isNaN)?"":money(vals.reduce((a,b)=>a+(isNaN(b)?0:b),0)); });
   const cells=rowVals(cols,sums);
+  // sums and broadened values add up row by row (a row-level calc applied to the totals would be wrong)
+  if(cols.some(c=>c.calc&&c.calc.op==="broad")){ const rv=t.rows.map(r=>rowVals(cols,r.c));
+    cols.forEach((c,i)=>{ if(c.calc&&c.calc.op!=="yoy"){ const vals=rv.map(r=>num(r[i])); cells[i]=vals.every(isNaN)?"":money(vals.reduce((a,b)=>a+(isNaN(b)?0:b),0)); } });
+    cols.forEach((c,i)=>{ if(c.calc&&c.calc.op==="yoy") cells[i]=pct(num(cells[c.calc.of[0]]),num(cells[c.calc.of[1]])); }); }
   const firstText=cols.findIndex(c=>!c.m&&!c.calc); if(firstText>=0&&!cells[firstText]) cells[firstText]="Total";
   return cells;
 }
@@ -394,16 +410,17 @@ const B=(h,i)=>L("bullets",h,i), N=(h,i)=>L("numbered",h,i);
 const X=(heading,text)=>({id:uid(), type:"text", heading, text});
 const KV=(heading,items)=>({id:uid(), type:"kv", heading, items:items.map(([k,v])=>({k,v}))});
 const blank=(n,len)=>Array.from({length:n},()=>Array(len).fill(""));
+const ls=s=>{ s.landscape=true; return s; };
 function sec(preset,title,carrier,blocks,newPage=true){ return {id:uid(), kind:"std", preset, title, carrier:"", showCarrier:carrier, newPage, blocks}; }
 
 /* ---------- presets (mirror the Word templates) ---------- */
 const PRESETS = [
- {id:"locations", g:"Locations", name:"Schedule of locations (blanket)", make:()=>sec("locations","Schedule of Locations",false,[
+ {id:"locations", g:"Locations", name:"Schedule of locations (blanket)", make:()=>ls(sec("locations","Schedule of Locations",false,[
    T("",[C("Loc #",{a:"c",w:5}),C("Bldg #",{a:"c",w:5}),C("Building Name",{w:25}),C("Street Address",{w:28}),C("City",{w:16}),C("State",{a:"c",w:6}),C("Zip Code",{a:"c",w:9}),C("Blkt #",{a:"c",w:6})],
-     [R(["","","Mailing Address","","","","",""],"hl"),...blank(3,8)])])},
- {id:"locations_values", g:"Locations", name:"Schedule of locations (scheduled values)", make:()=>sec("locations_values","Schedule of Locations",false,[
-   T("",[C("Loc #",{a:"c",w:5}),C("Bldg #",{a:"c",w:5}),C("Building Name",{w:22}),C("Street Address",{w:32}),C("Building",{a:"r",m:true,w:12}),C("BPP",{a:"r",m:true,w:12}),C("Total",{a:"r",m:true,w:12,calc:{op:"sum",of:[4,5]}})],
-     [R(["-","","Mailing Address","[Mailing Address]","","",""],"hl"),...blank(3,7)],{total:true})])},
+     [R(["","","Mailing Address","","","","",""],"hl"),...blank(3,8)])]))},
+ {id:"locations_values", g:"Locations", name:"Schedule of locations (scheduled values)", make:()=>ls(sec("locations_values","Schedule of Locations",false,[
+   T("",[C("Loc #",{a:"c",w:4}),C("Bldg #",{a:"c",w:4.5}),C("Building Name",{w:18}),C("Street Address",{w:18}),C("City",{w:9}),C("State",{a:"c",w:4}),C("Zip",{a:"c",w:5.5}),C("Val.",{a:"c",w:4.5}),C("Building Limit",{a:"r",m:true,w:8}),C("Building Value",{a:"r",m:true,w:8,calc:{op:"broad",of:[8,7]}}),C("BPP",{a:"r",m:true,w:8.5}),C("Total",{a:"r",m:true,w:9,calc:{op:"sum",of:[9,10]}})],
+     [R(["-","","Mailing Address","[Mailing Address]","","","","","","","",""],"hl"),...blank(3,12)],{total:true})]))},
  {id:"property_blanket", g:"Property", name:"Property (blanket)", make:()=>sec("property_blanket","Property",true,[
    T("",[C("Blanket #",{a:"c",w:9}),C("Blanket Type",{a:"c",w:27}),C("Limit",{a:"c",w:14}),C("Valuation",{a:"c",w:19}),C("Co-Insurance",{a:"c",w:15}),C("Perils",{a:"c",w:11})],
      [["1","[Blanket Description]","[Limit]","Replacement Cost*","Waived","Special"],["2","[Blanket Description]","[Limit]","Replacement Cost*","Waived","Special"]]),
@@ -725,14 +742,23 @@ function renderConsent(s){
    <div class="anote">Typing your name in the signature field above constitutes your electronic signature under applicable law (E-SIGN Act / UETA).</div></div>
   </div>`;
 }
+const VAL_CODES=[["RC","Replacement Cost"],["BV","Broadened Valuation (building value is 125% of the building limit)"],["ACV","Actual Cash Value"],["FRC","Functional Replacement Cost"],["AV","Agreed Value"]];
+function locNotes(s){
+  const t=(s.blocks||[]).find(b=>b.type==="table"); if(!t) return "";
+  const bi=t.cols.findIndex(c=>/^bldg/i.test(c.l)), vi=t.cols.findIndex(c=>/^val/i.test(c.l)); const out=[];
+  if(bi>=0&&t.rows.some(r=>/\*\s*$/.test(r.c[bi]||""))) out.push("*Actual Cash Value applies to the roof on buildings marked with an asterisk. This provision is automatically waived if the roof has been replaced in the last 10 years.");
+  if(vi>=0){ const used=new Set(t.rows.map(r=>String(r.c[vi]||"").trim().toUpperCase()).filter(Boolean));
+    const L=VAL_CODES.filter(([k])=>used.has(k)); if(L.length) out.push("Valuation: "+L.map(([k,v])=>`${k} = ${v}`).join("; ")+"."); }
+  return out.length?`<div class="blk locnote">${out.map(x=>`<p>${esc(x)}</p>`).join("")}</div>`:"";
+}
 function renderSection(s){
   let inner="";
-  if(s.kind==="std"){ inner=(s.showCarrier?(s.inForce?`<p class="carrier">Carrier: ${esc(s.carrier||"[Carrier]")}</p><p class="carrier term">Policy Term: ${esc(s.term||"[Policy Term]")}</p>`:`<p class="carrier">Proposed Carrier: ${esc(s.carrier||"[Proposed Carrier]")}</p>`):"")+s.blocks.map(b=>renderBlock(b,s)).join("")+(s.preset==="wc"&&!s.blocks.some(b=>b.type==="kv"&&b.items.some(i=>isAudit(s,i)))?`<div class="blk kv"><p>Audit Requirement: Annual</p></div>`:""); }
+  if(s.kind==="std"){ inner=(s.showCarrier?(s.inForce?`<p class="carrier">Carrier: ${esc(s.carrier||"[Carrier]")}</p><p class="carrier term">Policy Term: ${esc(s.term||"[Policy Term]")}</p>`:`<p class="carrier">Proposed Carrier: ${esc(s.carrier||"[Proposed Carrier]")}</p>`):"")+s.blocks.map(b=>renderBlock(b,s)).join("")+(/^locations/.test(s.preset)?locNotes(s):"")+(s.preset==="wc"&&!s.blocks.some(b=>b.type==="kv"&&b.items.some(i=>isAudit(s,i)))?`<div class="blk kv"><p>Audit Requirement: Annual</p></div>`:""); }
   else if(s.kind==="premium") inner=renderPremium(s);
   else if(s.kind==="acceptance") inner=renderAcceptance(s);
   else if(s.kind==="consent") return `<div class="sec${s.newPage?" np":""}" id="pv-${s.id}"><div class="in">${renderConsent(s)}</div></div>`;
   else if(s.kind==="confirm") return `<div class="sec cfp${s.newPage?" np":""}" id="pv-${s.id}"><div class="in">${renderConfirm(s)}</div></div>`;
-  return `<div class="sec${s.newPage?" np":""}" id="pv-${s.id}"><div class="bar">${esc(s.title)}</div><div class="in">${inner}</div></div>`;
+  return `<div class="sec${s.newPage?" np":""}${s.landscape&&s.kind==="std"?" ls":""}" id="pv-${s.id}"><div class="bar">${esc(s.title)}</div><div class="in">${inner}</div></div>`;
 }
 let SOI_PAGES=null, SOI_ERR=false;
 function pdfReady(){ return new Promise((res,rej)=>{ let n=0; const t=setInterval(()=>{ if(globalThis.pdfjsLib&&globalThis.pdfjsWorker){ clearInterval(t); res(globalThis.pdfjsLib); } else if(++n>400){ clearInterval(t); rej(new Error("PDF reader didn't load")); } },25); }); }
@@ -823,7 +849,7 @@ function editorStd(s,si){
   const blocks=s.blocks.map((b,bi)=>{ const bp=`${sp}.blocks.${bi}`;
     const body=b.type==="table"?editorTable(b,bp):(b.type==="bullets"||b.type==="numbered")?editorList(b,bp):b.type==="kv"?editorKV(b,bp):`<textarea class="inp" style="min-height:80px" data-p="${bp}.text">${esc(b.text)}</textarea><p class="hint">Leave a blank line between paragraphs. **Bold** works here too.</p>`;
     return `<div class="card"><div class="chead"><span class="ctype">${BTYPE[b.type]}</span>${mv(bp)}</div><div class="f">${inp(`${bp}.heading`,b.heading,"Heading above this block (optional)")}</div>${body}</div>`; }).join("");
-  return `<div class="card"><div class="row2">${fld("Section title",`${sp}.title`,s.title)}${fld(s.inForce?"Carrier":"Proposed carrier",`${sp}.carrier`,s.carrier,"e.g. Brotherhood Mutual")}</div>${chk("Show carrier line",`${sp}.showCarrier`,s.showCarrier)}${chk("Policy already in force (not a quote)",`${sp}.inForce`,s.inForce)}${chk("Start on a new page",`${sp}.newPage`,s.newPage)}
+  return `<div class="card"><div class="row2">${fld("Section title",`${sp}.title`,s.title)}${fld(s.inForce?"Carrier":"Proposed carrier",`${sp}.carrier`,s.carrier,"e.g. Brotherhood Mutual")}</div>${chk("Show carrier line",`${sp}.showCarrier`,s.showCarrier)}${chk("Policy already in force (not a quote)",`${sp}.inForce`,s.inForce)}${chk("Start on a new page",`${sp}.newPage`,s.newPage)}${chk("Landscape page (room for more columns)",`${sp}.landscape`,s.landscape)}
    ${s.inForce?`<div class="row2" style="margin-top:8px">${fld("Policy term",`${sp}.term`,s.term,"e.g. 3.1.2026-3.1.2027")}<div></div></div><p class="hint" style="margin-top:0">Prints “Carrier” instead of “Proposed Carrier,” plus the policy term. On the Premium Summary, mark this line In force so its premium moves to a footnote.</p>`:""}</div>
    ${blocks}<div class="addbar">${Object.entries(BTYPE).map(([k,v])=>`<button class="btn sm" data-act="addBlock" data-p="${sp}" data-type="${k}">+ ${v}</button>`).join("")}</div>`;
 }
@@ -1220,7 +1246,7 @@ function buildPrompt(){
     const s=p.make(); const parts=[]; const k={table:0,bullets:0,numbered:0,text:0,kv:0};
     s.blocks.forEach(b=>{
       const key=b.type==="numbered"?"bullets":b.type; const i=k[key]++;
-      if(b.type==="table") parts.push(`tables[${i}]${b.heading?` "${b.heading}"`:""}: columns ${b.cols.map(c=>c.l+(c.calc?" (calculated, leave \"\")":"")).join(" | ")}; example first column: ${b.rows.slice(0,6).map(r=>r.c[0]).filter(Boolean).map(x=>`"${x}"`).join(", ")||"(none)"}`);
+      if(b.type==="table") parts.push(`tables[${i}]${b.heading?` "${b.heading}"`:""}: columns ${b.cols.map(c=>c.l+(c.calc?" (calculated, leave \"\")":"")).join(" | ")}; example first column: ${b.rows.slice(0,40).map(r=>r.c[0]).filter(Boolean).map(x=>`"${x}"`).join(", ")||"(none)"}`);
       if(b.type==="bullets"||b.type==="numbered") parts.push(`lists[${i}]${b.heading?` "${b.heading}"`:""}`);
       if(b.type==="text") parts.push(`texts[${i}]${b.heading?` "${b.heading}"`:""}: ${b.text}`);
       if(b.type==="kv") parts.push(`fields[${i}]: ${b.items.map(x=>x.k).join(", ")}`);
@@ -1236,17 +1262,28 @@ Rules:
 - Never guess. If something is not in the document, leave it out or use "".
 - The source may be a carrier proposal, a quote, renewal declarations pages, or several of these for the same account. Combine everything into ONE result. Don't list the same coverage twice.
 - When a proposal and declarations disagree on limits or premium, use the proposal (it is the offer being presented). Use the declarations for details a proposal often leaves out: additional named insureds, auto coverage symbols, and schedules of locations, buildings, and vehicles.
-- EXPIRING documents: if any document covers the expiring (prior) policy period, use it ONLY to work out the change in total insured value (TIV = all building plus business personal property limits). Put this sentence first in the property section's notes list: "**Total insured value (TIV) is $X, a Y% increase over expiring.**" (say "decrease" if it went down; round to one decimal). Take everything else from the renewal or proposed documents. If no expiring documents are included, leave the TIV sentence out.
+- EXPIRING documents: if any document covers the expiring (prior) policy period, use it for exactly two things. (1) Total insured value: work out the change in TIV (all building plus business personal property limits) and put this sentence first in the property section's notes list: "**Total insured value (TIV) is $X, a Y% increase over expiring.**" (say "decrease" if it went down; round to one decimal). (2) Expiring premiums: for each line in "premiums", add "expiringPremium" (the expiring annual premium) and "expiringCarrier" (the expiring carrier), using the same coverage name as the proposed line. If a line appears only on the expiring documents, still list it with "premium": "". Take everything else from the renewal or proposed documents. If no expiring documents are included, leave out the TIV sentence and the expiring fields.
 - Additional named insureds: if any are shown, include a General Liability note "Additional Named Insureds: name; name; name".
+- Schedule of locations ("locations" or "locations_values"): one row per building, plus the mailing address row first.
+    • Roofs at actual cash value: if a building's roof is valued at actual cash value, add "*" to the end of its Bldg # (e.g. "2*"). In "property_ext", set texts[0] to the roof sentence with those buildings listed; if no roofs are at actual cash value, set texts[0] to "".
+    • PITO (property in the open): list each PITO item as its own row under its location, with "(PITO)" at the end of the Building Name (e.g. "Playground Equipment (PITO)"; use "Property in the Open (PITO)" if the carrier gives no description) and the Bldg # the carrier shows. In "locations_values", put its limit in Building Limit, and its valuation in Val.
+    • Valuation ("locations_values" only): put a code in the Val. column for every building: RC (replacement cost), BV (broadened valuation), ACV (actual cash value), FRC (functional replacement cost), or AV (agreed value). Put the building limit exactly as the carrier states it in Building Limit; do not multiply it. Leave the calculated columns as "" (the builder applies the 125% for BV).
+    • Blanket coverage: give each blanket's valuation in the "property_blanket" Valuation column (e.g. "Replacement Cost*"). Broadened valuation never applies to a blanket.
 - Commercial auto: copy each coverage's symbol from the declarations into the Symbol column (e.g. "1 – Any Auto", "2 – Owned Autos Only").
 - Only include sections for coverages that actually appear in the documents.
 - If a coverage has no matching section below (for example accident medical, a stand-alone abuse policy, or travel coverage), still include it: use "preset": "custom" with a "title" (e.g. "Volunteer Accident") and optional "columns" (e.g. ["Coverage","Limit","Deductible"]), then put its rows in tables[0]. Never drop a coverage just because there's no section for it, and never list a premium without also listing its coverage.
-- KEEP IT HIGH LEVEL. This is a client-facing summary, not a copy of the policy forms. For each coverage, give the headline limits (occurrence and aggregate for liability; the limit and deductible for property, crime, and inland marine).
-- Do NOT list supplemental payments, built-in sublimits, coverage extensions, or "additional coverages" that come automatically inside a coverage form. Include an extension only if it is a separately scheduled or endorsed coverage with its own limit, or it is one of the example rows for that section.
-- Do not use indented sub-rows, EXCEPT for these three, which keep their full detail:
+- KEEP IT HIGH LEVEL. This is a client-facing summary, not a copy of the policy forms. For each coverage, give the headline limits (occurrence and aggregate for liability; the limit and deductible for property, crime, and inland marine). The property sections below are the exception.
+- WHERE COVERAGES GO. Follow this routing exactly:
+    • "gl" table: ONLY the core liability limits: each occurrence / general aggregate, products-completed operations, fire legal liability (damage to rented premises), medical payments, and personal & advertising injury if shown separately. Nothing else goes in this table.
+    • "gl_addl": EVERY other liability coverage on the policy that has its own limit, whether optional, endorsed, or included. Examples: employment practices liability (and wage & hour), directors & officers, sexual or abusive acts / sexual misconduct, employee benefits & fiduciary, counseling, educator's legal, defense reimbursement, hired & non-owned auto, media, pollution, religious freedom, traumatic incident, terrorism. Never put these in "gl". A coverage written as a separate policy (its own policy number) uses its own section or "custom" instead.
+    • "property_ext": the major property coverages and extensions with their own limits (business income / earnings & extra expense, earthquake, flood and water, sewer & drain backup, equipment breakdown, terrorism) in the first table, and every deductible by cause of loss in the second table.
+    • "property_addl": list EVERY additional coverage and automatic coverage extension the property form shows with a limit (ordinance or law, debris removal, newly acquired buildings, property off premises, outdoor property, fire department service charge, pollutant clean-up, rewards, spoilage, and so on), in the order the carrier shows them. Copy the limit text in full, including time limits and any separate deductible (e.g. "$1,000,000; 180 days"). Don't repeat anything already listed in "property_ext".
+- Outside "property_addl", do not list supplemental payments or sublimits buried inside a coverage form (e.g. GL supplementary payments, auto towing). Include an extension only if it is a separately scheduled or endorsed coverage with its own limit, or it is one of the example rows for that section.
+- Do not use indented sub-rows, EXCEPT for these four, which keep their full detail:
     1. Cyber ("cyber" section): list each insuring agreement as a group row with its sublimits and retentions as indented rows beneath it.
     2. Defense Reimbursement (in "gl_addl"): a group row with each component (e.g., covered lawsuit, law enforcement inquiry) indented beneath it.
     3. Hired and non-owned vehicle coverage (the "Non-Owned Vehicle Coverage" group in "gl_addl"): a group row with liability, medical payments, and physical damage indented beneath it, including any deductible.
+    4. Property additional coverages ("property_addl"): a coverage with lettered or separately limited parts (e.g. Ordinance or Law A, B, C) is a group row with its parts indented beneath it, as in the examples.
 - Everywhere else, match the level of detail in the example rows. When in doubt, leave it out; the producer can add rows.
 - For each table, list only rows that apply, in the order a reader would expect. Use the example rows as naming guidance, not as required rows.
 - A row is an array of cell strings in column order. For a heading row with indented rows beneath it, use {"cells":[...],"style":"group"}; for the indented rows use {"cells":[...],"style":"sub"}.
@@ -1268,7 +1305,7 @@ JSON shape:
     {"preset": "custom", "title": "Coverage name", "carrier": "<carrier>", "columns": ["Coverage","Limit","Deductible"],
      "tables": [[ ["cell","cell","cell"] ]]}
   ],
-  "premiums": [{"coverage": "Package Policy", "premium": "$12,345", "carrier": "Carrier name"},
+  "premiums": [{"coverage": "Package Policy", "premium": "$12,345", "carrier": "Carrier name", "expiringPremium": "$11,800", "expiringCarrier": "Carrier name"},
                {"coverage": "Accident Medical", "premium": "$850", "carrier": "Carrier name", "inForce": true, "term": "3.1.2026-3.1.2027"}]
 }
 "tables", "lists", "texts", and "fields" are positional: the first table in your output fills tables[0] of that section, and so on. Omit any you don't need.
@@ -1310,7 +1347,8 @@ function doImport(text){
     if(!ps){ ps=makeSection("premium"); ps.rows=[]; const pos=S.sections.findIndex(o=>ORDER.indexOf(o.preset)>ORDER.indexOf("premium")); S.sections.splice(pos<0?S.sections.length:pos,0,ps); }
     ps.rows=ps.rows.filter(r=>r.cov||r.propP||r.expP);
     d.premiums.forEach(p=>{ if(!p||!p.coverage) return; const name=String(p.coverage); const row=ps.rows.find(r=>r.cov.toLowerCase()===name.toLowerCase());
-      const r2=row||{cov:name,expP:"",expC:"",propP:"",propC:""}; r2.propP=String(p.premium??""); if(p.carrier) r2.propC=String(p.carrier);
+      const r2=row||{cov:name,expP:"",expC:"",propP:"",propC:""}; if(p.premium!=null||!row) r2.propP=String(p.premium??""); if(p.carrier) r2.propC=String(p.carrier);
+      if(p.expiringPremium!=null&&String(p.expiringPremium).trim()){ r2.expP=String(p.expiringPremium); ps.showExpiring=true; } if(p.expiringCarrier) r2.expC=String(p.expiringCarrier);
       if(p.inForce){ r2.inForce=true; if(p.term) r2.term=String(p.term); }
       if(!row) ps.rows.push(r2); prem++; });
   }
